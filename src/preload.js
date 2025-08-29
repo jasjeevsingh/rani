@@ -136,8 +136,8 @@ contextBridge.exposeInMainWorld('api', {
     initializeEncryptionKey: () => ipcRenderer.invoke('initialize-encryption-key') // New for keychain
   },
 
-  // src/ui/app/PickleGlassApp.js
-  pickleGlassApp: {
+  // src/ui/app/RaniApp.js
+  raniApp: {
     // Listeners
     onClickThroughToggled: (callback) => ipcRenderer.on('click-through-toggled', callback),
     removeOnClickThroughToggled: (callback) => ipcRenderer.removeListener('click-through-toggled', callback),

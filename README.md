@@ -1,26 +1,257 @@
+````markdown
 <p align="center">
-  <a href="https://pickle.com/glass">
-   <img src="./public/assets/banner.gif" alt="Logo">
-  </a>
-
-  <h1 align="center">Glass by Pickle: Digital Mind Extension 🧠</h1>
-
+  <h1 align="center">🔬 RANI - Research Assistant for Novel Inquiry</h1>
+  <p align="center">
+    <em>An AI-powered research copilot designed to support researchers in learning, annotating, exploring, and experimenting with new ideas through real-time dialogue, paper analysis, and hands-on practice.</em>
+  </p>
 </p>
 
-
 <p align="center">
-  <a href="https://discord.gg/UCZH5B5Hpd"><img src="./public/assets/button_dc.png" width="80" alt="Pickle Discord"></a>&ensp;<a href="https://pickle.com"><img src="./public/assets/button_we.png" width="105" alt="Pickle Website"></a>&ensp;<a href="https://x.com/intent/user?screen_name=leinadpark"><img src="./public/assets/button_xe.png" width="109" alt="Follow Daniel"></a>
+  <a href="https://github.com/jasjeevsingh/rani/issues"><img src="https://img.shields.io/github/issues/jasjeevsingh/rani" alt="Issues"></a>
+  <a href="https://github.com/jasjeevsingh/rani/stargazers"><img src="https://img.shields.io/github/stars/jasjeevsingh/rani" alt="Stars"></a>
+  <a href="https://github.com/jasjeevsingh/rani/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jasjeevsingh/rani" alt="License"></a>
 </p>
 
-> This project is a fork of [CheatingDaddy](https://github.com/sohzm/cheating-daddy) with modifications and enhancements. Thanks to [Soham](https://x.com/soham_btw) and all the open-source contributors who made this possible!
+> **Note**: This project is a research-focused fork of [Glass by Pickle](https://github.com/pickle-com/glass), extensively modified and enhanced for academic research workflows. Thanks to the original open-source contributors who made this foundation possible!
 
-🤖 **Fast, light & open-source**—Glass lives on your desktop, sees what you see, listens in real time, understands your context, and turns every moment into structured knowledge.
+## 🎯 What is RANI?
 
-💬 **Proactive in meetings**—it surfaces action items, summaries, and answers the instant you need them.
+RANI transforms your desktop into an intelligent research companion that:
 
-🫥️ **Truly invisible**—never shows up in screen recordings, screenshots, or your dock; no always-on capture or hidden sharing.
+🧠 **Understands Your Research Context** — Sees your screen, listens to meetings, and maintains conversation history to provide contextually aware assistance
 
-To have fun building with us, join our [Discord](https://discord.gg/UCZH5B5Hpd)!
+📚 **Analyzes Documents** — Upload and annotate PDFs, extract insights, and connect ideas across papers
+
+🔍 **Discovers Related Work** — Suggests relevant papers and helps explore research connections
+
+⚗️ **Enables Experimentation** — Provides an integrated coding environment for testing formulas and concepts
+
+💬 **Collaborates Like a Colleague** — Responds as a helpful research partner who says "let's work this out together"
+
+## 🏗️ Architecture Overview
+
+```mermaid
+graph TD
+    A[Screen Capture] --> D[Processing Pipeline]
+    B[Audio Input] --> D
+    C[Document Upload] --> D
+    
+    D --> E[AI Analysis Engine]
+    E --> F[Multi-Modal AI Providers]
+    F --> G[Research Assistant Response]
+    
+    H[PDF Annotation] --> I[Knowledge Base]
+    J[Paper Discovery] --> I
+    K[Code Sandbox] --> I
+    I --> E
+    
+    subgraph "Input Sources"
+        A
+        B
+        C
+    end
+    
+    subgraph "Research Features"
+        H
+        J
+        K
+    end
+    
+    subgraph "AI Providers"
+        F1[OpenAI]
+        F2[Anthropic]
+        F3[Google Gemini]
+        F4[Local Ollama]
+        F --> F1
+        F --> F2
+        F --> F3
+        F --> F4
+    end
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Python** 3.8+ ([Download](https://www.python.org/downloads/))
+- **Node.js** 20.x.x ([Download](https://nodejs.org/))
+- **macOS/Windows/Linux** (macOS recommended for full features)
+
+```bash
+# Verify Node.js version
+node --version  # Should be 20.x.x
+
+# If needed, install Node 20 with nvm:
+# curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+# nvm install 20 && nvm use 20
+```
+
+### Installation
+
+```bash
+# Clone and setup
+git clone https://github.com/jasjeevsingh/rani.git
+cd rani
+npm run setup
+```
+
+### First Run
+
+```bash
+npm start
+```
+
+## 🔬 Research Features
+
+### 1. **Real-time Research Context**
+- **Screen Analysis**: Understands what you're reading or working on
+- **Audio Transcription**: Captures meeting discussions and lectures
+- **Conversation Memory**: Maintains research session context
+
+### 2. **Document Analysis & Annotation**
+- **PDF Processing**: Upload research papers and documents
+- **Smart Highlighting**: Annotate with AI-enhanced notes
+- **Cross-Reference**: Link annotations to conversation context
+
+### 3. **Discovery & Exploration**
+- **Paper Recommendations**: Semantic Scholar and arXiv integration
+- **Research Connections**: Identifies related work and concepts
+- **Trend Analysis**: Spots emerging patterns in your research area
+
+### 4. **Experimental Sandbox**
+- **Code Execution**: Test formulas and algorithms inline
+- **Visualization**: Generate plots and charts
+- **Rapid Prototyping**: Experiment with research ideas immediately
+
+## 🎛️ Research Modes
+
+| Mode | Description | Use Cases |
+|------|-------------|-----------|
+| **📖 Annotation** | Highlight and annotate PDFs with AI assistance | Paper review, literature analysis |
+| **🔍 Exploration** | Discover related papers and research connections | Literature search, gap analysis |
+| **⚗️ Experiment** | Code sandbox for testing concepts | Formula validation, proof-of-concept |
+| **🎧 Listen** | Real-time meeting/lecture transcription | Conference notes, seminar capture |
+| **💬 Ask** | Contextual research discussions | Quick queries, brainstorming |
+
+## ⌨️ Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd + ` | Toggle main window |
+| `Ctrl/Cmd + Enter` | Ask AI with screen context |
+| `Ctrl/Cmd + Shift + A` | Open annotation mode |
+| `Ctrl/Cmd + Shift + E` | Open exploration mode |
+| `Ctrl/Cmd + Arrows` | Move window position |
+
+## 🤖 AI Providers Supported
+
+- **OpenAI**: GPT-4, GPT-3.5 Turbo with API key
+- **Anthropic**: Claude 3 Opus, Sonnet, Haiku
+- **Google**: Gemini Pro, Gemini Vision
+- **Local**: Ollama for privacy-focused research
+
+## 🔧 Configuration
+
+### API Keys Setup
+1. **Quick Start**: Use built-in free API access (Google sign-in)
+2. **Personal Keys**: Add your own API keys in Settings
+3. **Local Models**: Install Ollama for offline research
+
+### Research Profiles
+- **Academic Researcher**: Formal, citation-focused responses
+- **Grad Student**: Encouraging, learning-oriented assistance
+- **Industry R&D**: Practical, application-focused guidance
+- **Interdisciplinary**: Broad connections across fields
+
+## 📁 Project Structure
+
+```
+rani/
+├── src/                    # Main Electron application
+│   ├── features/          
+│   │   ├── documents/     # PDF processing & storage
+│   │   ├── research/      # Paper discovery, annotations
+│   │   ├── ask/           # AI conversation engine
+│   │   └── listen/        # Audio transcription
+│   ├── ui/                # Research-focused UI components
+│   └── bridge/           # IPC communication
+├── pickleglass_web/       # Web dashboard (now RANI web)
+├── aec/                   # Audio processing (Rust/WASM)
+└── docs/                  # Documentation
+```
+
+## 🧪 Development & Contributing
+
+We welcome contributions from the research community! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup
+- Code architecture
+- Feature roadmap
+- Research use cases
+
+### Building from Source
+
+```bash
+# Development mode
+npm run start
+
+# Build for distribution
+npm run build
+
+# Watch mode for UI changes
+npm run watch:renderer
+```
+
+## 🎯 Roadmap
+
+### Current Status ✅
+- [x] Multi-modal AI integration
+- [x] Real-time screen & audio capture
+- [x] Basic document upload
+- [x] Conversation persistence
+
+### Phase 1: Research Foundation 🚧
+- [ ] PDF annotation system
+- [ ] Research-focused prompts
+- [ ] Enhanced document management
+
+### Phase 2: Discovery & Analysis 🔮
+- [ ] Semantic Scholar API integration
+- [ ] Paper recommendation engine
+- [ ] Citation network analysis
+
+### Phase 3: Collaboration & Sharing 🔮
+- [ ] Research team features
+- [ ] Annotation sharing
+- [ ] Collaborative notebooks
+
+## 🔒 Privacy & Security
+
+- **Local-First**: All processing happens on your device by default
+- **Optional Cloud Sync**: Choose to sync with encrypted cloud storage
+- **No Screen Recording**: Only captures when explicitly requested
+- **Research Data Protection**: Your research remains private and secure
+
+## 📞 Support & Community
+
+- **Issues**: [GitHub Issues](https://github.com/jasjeevsingh/rani/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/jasjeevsingh/rani/discussions)
+- **Email**: [research@rani.ai](mailto:research@rani.ai)
+
+## 📜 License
+
+GPL-3.0 License - see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+Built on the foundation of [Glass by Pickle](https://github.com/pickle-com/glass). Special thanks to:
+- The original Pickle team for the robust foundation
+- The open-source community for continuous improvements
+- Researchers who provide feedback and use cases
+
+---
+
+**RANI**: Where research meets intelligence. Let's explore the unknown together. 🔬✨
+````
 
 ## Instant Launch
 

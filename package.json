@@ -1,8 +1,8 @@
 {
-    "name": "pickle-glass",
-    "productName": "Glass",
-    "version": "0.2.4",
-    "description": "Cl*ely for Free",
+    "name": "rani",
+    "productName": "RANI",
+    "version": "0.3.0",
+    "description": "Research Assistant for Novel Inquiry - AI-powered research copilot designed to support researchers in learning, annotating, exploring, and experimenting with new ideas.",
     "main": "src/index.js",
     "scripts": {
         "setup": "npm install && cd pickleglass_web && npm install && npm run build && cd .. && npm start",
@@ -20,24 +20,26 @@
         "watch:renderer": "node build.js --watch"
     },
     "keywords": [
-        "glass",
-        "pickle glass",
-        "ai assistant",
-        "real-time",
-        "live summary",
-        "contextual ai"
+        "rani",
+        "research assistant",
+        "ai research copilot",
+        "paper analysis",
+        "real-time research",
+        "academic assistant",
+        "research companion"
     ],
     "author": {
-        "name": "Pickle Team"
+        "name": "RANI Research Team"
     },
     "license": "GPL-3.0",
     "dependencies": {
         "@anthropic-ai/sdk": "^0.56.0",
         "@deepgram/sdk": "^4.9.1",
+        "@esbuild/darwin-x64": "^0.25.9",
         "@google/genai": "^1.8.0",
         "@google/generative-ai": "^0.24.1",
         "axios": "^1.10.0",
-        "better-sqlite3": "^9.6.0",
+        "better-sqlite3": "^12.2.0",
         "cors": "^2.8.5",
         "dotenv": "^17.0.0",
         "electron-squirrel-startup": "^1.0.1",
@@ -53,6 +55,7 @@
         "portkey-ai": "^1.10.1",
         "react-hot-toast": "^2.5.2",
         "sharp": "^0.34.2",
+        "sqlite3": "^5.1.7",
         "validator": "^13.11.0",
         "wait-on": "^8.0.3",
         "ws": "^8.18.0"

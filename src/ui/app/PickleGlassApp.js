@@ -6,7 +6,7 @@ import { ShortcutSettingsView } from '../settings/ShortCutSettingsView.js';
 
 import '../listen/audioCore/renderer.js';
 
-export class PickleGlassApp extends LitElement {
+export class RaniApp extends LitElement {
     static styles = css`
         :host {
             display: block;
@@ -51,7 +51,7 @@ export class PickleGlassApp extends LitElement {
     constructor() {
         super();
         const urlParams = new URLSearchParams(window.location.search);
-        this.currentView = urlParams.get('view') || 'listen';
+        this.currentView = urlParams.get('view') || 'research';
         this.currentResponseIndex = -1;
         this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
         
@@ -75,7 +75,7 @@ export class PickleGlassApp extends LitElement {
         super.connectedCallback();
         
         if (window.api) {
-            window.api.pickleGlassApp.onClickThroughToggled((_, isEnabled) => {
+            window.api.raniApp.onClickThroughToggled((_, isEnabled) => {
                 this._isClickThrough = isEnabled;
             });
         }
@@ -84,7 +84,7 @@ export class PickleGlassApp extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         if (window.api) {
-            window.api.pickleGlassApp.removeAllClickThroughListeners();
+            window.api.raniApp.removeAllClickThroughListeners();
         }
     }
 
@@ -128,6 +128,7 @@ export class PickleGlassApp extends LitElement {
 
     render() {
         switch (this.currentView) {
+            case 'research':
             case 'listen':
                 return html`<listen-view
                     .currentResponseIndex=${this.currentResponseIndex}
@@ -158,4 +159,4 @@ export class PickleGlassApp extends LitElement {
     }
 }
 
-customElements.define('pickle-glass-app', PickleGlassApp);
+customElements.define('rani-app', RaniApp);

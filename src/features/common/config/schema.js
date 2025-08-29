@@ -14,7 +14,9 @@ const LATEST_SCHEMA = {
             { name: 'id', type: 'TEXT PRIMARY KEY' },
             { name: 'uid', type: 'TEXT NOT NULL' },
             { name: 'title', type: 'TEXT' },
-            { name: 'session_type', type: 'TEXT DEFAULT \'ask\'' },
+            { name: 'session_type', type: 'TEXT DEFAULT \'research\'' },
+            { name: 'research_mode', type: 'TEXT DEFAULT \'exploration\'' },
+            { name: 'document_refs', type: 'TEXT' },
             { name: 'started_at', type: 'INTEGER' },
             { name: 'ended_at', type: 'INTEGER' },
             { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' },
@@ -113,6 +115,50 @@ const LATEST_SCHEMA = {
         columns: [
             { name: 'uid', type: 'TEXT PRIMARY KEY' },
             { name: 'keychain_completed', type: 'INTEGER DEFAULT 0' }
+        ]
+    },
+    documents: {
+        columns: [
+            { name: 'id', type: 'TEXT PRIMARY KEY' },
+            { name: 'uid', type: 'TEXT NOT NULL' },
+            { name: 'filename', type: 'TEXT NOT NULL' },
+            { name: 'content_type', type: 'TEXT NOT NULL' },
+            { name: 'file_path', type: 'TEXT NOT NULL' },
+            { name: 'file_size', type: 'INTEGER' },
+            { name: 'extracted_text', type: 'TEXT' },
+            { name: 'metadata', type: 'TEXT' },
+            { name: 'uploaded_at', type: 'INTEGER' },
+            { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
+        ]
+    },
+    annotations: {
+        columns: [
+            { name: 'id', type: 'TEXT PRIMARY KEY' },
+            { name: 'document_id', type: 'TEXT NOT NULL' },
+            { name: 'session_id', type: 'TEXT' },
+            { name: 'page_number', type: 'INTEGER' },
+            { name: 'coordinates', type: 'TEXT' },
+            { name: 'highlight_text', type: 'TEXT' },
+            { name: 'note_text', type: 'TEXT' },
+            { name: 'annotation_type', type: 'TEXT DEFAULT \'highlight\'' },
+            { name: 'created_at', type: 'INTEGER' },
+            { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
+        ]
+    },
+    research_papers: {
+        columns: [
+            { name: 'id', type: 'TEXT PRIMARY KEY' },
+            { name: 'title', type: 'TEXT NOT NULL' },
+            { name: 'authors', type: 'TEXT' },
+            { name: 'abstract', type: 'TEXT' },
+            { name: 'url', type: 'TEXT' },
+            { name: 'arxiv_id', type: 'TEXT' },
+            { name: 'doi', type: 'TEXT' },
+            { name: 'published_date', type: 'TEXT' },
+            { name: 'citation_count', type: 'INTEGER' },
+            { name: 'source', type: 'TEXT' },
+            { name: 'added_at', type: 'INTEGER' },
+            { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
         ]
     }
 };
