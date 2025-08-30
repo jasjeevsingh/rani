@@ -116,6 +116,7 @@ contextBridge.exposeInMainWorld('api', {
     // invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
     sendListenButtonClick: (listenButtonText) => ipcRenderer.invoke('listen:changeSession', listenButtonText),
     sendAskButtonClick: () => ipcRenderer.invoke('ask:toggleAskButton'),
+    sendResearchButtonClick: () => ipcRenderer.invoke('research:toggleResearchView'),
     sendToggleAllWindowsVisibility: () => ipcRenderer.invoke('shortcut:toggleAllWindowsVisibility'),
     
     // Listeners
@@ -302,5 +303,82 @@ contextBridge.exposeInMainWorld('api', {
     // Listeners
     onChangeListenCaptureState: (callback) => ipcRenderer.on('change-listen-capture-state', callback),
     removeOnChangeListenCaptureState: (callback) => ipcRenderer.removeListener('change-listen-capture-state', callback)
+  },
+
+  // Research functionality for RANI
+  documents: {
+    // Import a document file
+    import: (filePath, metadata = {}) => 
+      ipcRenderer.invoke('documents:import', filePath, metadata),
+    
+    // Get user's documents
+    getUserDocuments: (limit = 50) => 
+      ipcRenderer.invoke('documents:getUserDocuments', limit),
+    
+    // Search documents
+    search: (searchTerm, limit = 20) => 
+      ipcRenderer.invoke('documents:search', searchTerm, limit),
+    
+    // Get specific document
+    getDocument: (documentId) => 
+      ipcRenderer.invoke('documents:getDocument', documentId),
+    
+    // Delete document
+    deleteDocument: (documentId) => 
+      ipcRenderer.invoke('documents:deleteDocument', documentId),
+    
+    // Select and upload files via dialog
+    selectAndUpload: () => 
+      ipcRenderer.invoke('documents:selectAndUpload'),
+    
+    // Upload specific file
+    uploadFile: (filePath) => 
+      ipcRenderer.invoke('documents:uploadFile', filePath),
+    
+    // Open document in viewer
+    openDocument: (documentId) => 
+      ipcRenderer.invoke('documents:openDocument', documentId)
+  },
+
+  // Annotation management API
+  annotations: {
+    // Create annotation
+    create: (annotationData) => 
+      ipcRenderer.invoke('annotations:create', annotationData),
+    
+    // Get document annotations
+    getDocumentAnnotations: (documentId) => 
+      ipcRenderer.invoke('annotations:getDocumentAnnotations', documentId),
+    
+    // Get session annotations
+    getSessionAnnotations: (sessionId) => 
+      ipcRenderer.invoke('annotations:getSessionAnnotations', sessionId),
+    
+    // Update annotation
+    update: (annotationId, updates) => 
+      ipcRenderer.invoke('annotations:update', annotationId, updates),
+    
+    // Delete annotation
+    delete: (annotationId) => 
+      ipcRenderer.invoke('annotations:delete', annotationId),
+    
+    // Search annotations
+    search: (searchTerm, limit = 20) => 
+      ipcRenderer.invoke('annotations:search', searchTerm, limit)
+  },
+
+  // Research paper discovery API
+  research: {
+    // Search for papers
+    searchPapers: (query, options = {}) => 
+      ipcRenderer.invoke('research:searchPapers', query, options),
+    
+    // Import/download paper
+    importPaper: (paperData) => 
+      ipcRenderer.invoke('research:importPaper', paperData),
+    
+    // Get user's imported papers
+    getUserPapers: (limit = 50) => 
+      ipcRenderer.invoke('research:getUserPapers', limit)
   }
 });

@@ -150,11 +150,13 @@ class WindowLayoutManager {
     
         const ask = this.windowPool.get('ask');
         const listen = this.windowPool.get('listen');
+        const research = this.windowPool.get('research');
     
         const askVis = visibility.ask && ask && !ask.isDestroyed();
         const listenVis = visibility.listen && listen && !listen.isDestroyed();
+        const researchVis = visibility.research && research && !research.isDestroyed();
     
-        if (!askVis && !listenVis) return {};
+        if (!askVis && !listenVis && !researchVis) return {};
     
         const PAD = 8;
         const headerTopRel = headerBounds.y - workAreaY;
@@ -167,6 +169,7 @@ class WindowLayoutManager {
     
         const askB = askVis ? ask.getBounds() : null;
         const listenB = listenVis ? listen.getBounds() : null;
+        const researchB = researchVis ? research.getBounds() : null;
 
         if (askVis) {
             console.log(`[Layout Debug] Ask Window Bounds: height=${askB.height}, width=${askB.width}`);
@@ -174,10 +177,28 @@ class WindowLayoutManager {
         if (listenVis) {
             console.log(`[Layout Debug] Listen Window Bounds: height=${listenB.height}, width=${listenB.width}`);
         }
+        if (researchVis) {
+            console.log(`[Layout Debug] Research Window Bounds: height=${researchB.height}, width=${researchB.width}`);
+        }
     
         const layout = {};
+        
+        // Handle research window separately since it's larger
+        if (researchVis) {
+            let xRel = headerCenterXRel - researchB.width / 2;
+            xRel = Math.max(PAD, Math.min(screenWidth - researchB.width - PAD, xRel));
     
-        if (askVis && listenVis) {
+            let yPos;
+            if (strategy.primary === 'above') {
+                yPos = (headerBounds.y - workAreaY) - PAD - researchB.height;
+            } else { // 'below'
+                yPos = (headerBounds.y - workAreaY) + headerBounds.height + PAD;
+            }
+            
+            layout.research = { x: Math.round(xRel + workAreaX), y: Math.round(yPos + workAreaY), width: researchB.width, height: researchB.height };
+        }
+    
+        if (askVis && listenVis && !researchVis) {
             let askXRel = headerCenterXRel - (askB.width / 2);
             let listenXRel = askXRel - listenB.width - PAD;
     
@@ -199,7 +220,7 @@ class WindowLayoutManager {
                 layout.ask = { x: Math.round(askXRel + workAreaX), y: Math.round(yAbs), width: askB.width, height: askB.height };
                 layout.listen = { x: Math.round(listenXRel + workAreaX), y: Math.round(yAbs), width: listenB.width, height: listenB.height };
             }
-        } else { // Single window
+        } else if ((askVis || listenVis) && !researchVis) { // Single window (ask or listen, but not research)
             const winName = askVis ? 'ask' : 'listen';
             const winB = askVis ? askB : listenB;
             if (!winB) return {};

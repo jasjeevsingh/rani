@@ -84,6 +84,12 @@ module.exports = {
     ipcMain.handle('ask:toggleAskButton', async () => await askService.toggleAskButton());
     ipcMain.handle('ask:closeAskWindow',  async () => await askService.closeAskWindow());
     
+    // Research
+    ipcMain.handle('research:toggleResearchView', async () => {
+        const windowBridge = require('./windowBridge');
+        return await windowBridge.toggleResearchView();
+    });
+    
     // Listen
     ipcMain.handle('listen:sendMicAudio', async (event, { data, mimeType }) => await listenService.handleSendMicAudioContent(data, mimeType));
     ipcMain.handle('listen:sendSystemAudio', async (event, { data, mimeType }) => {

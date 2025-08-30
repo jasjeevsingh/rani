@@ -28,6 +28,11 @@ module.exports = {
     ipcMain.handle('adjust-window-height', (event, { winName, height }) => windowManager.adjustWindowHeight(winName, height));
   },
 
+  async toggleResearchView() {
+    const windowManager = require('../window/windowManager');
+    return await windowManager.toggleResearchView();
+  },
+
   notifyFocusChange(win, isFocused) {
     win.webContents.send('window:focus-change', isFocused);
   }

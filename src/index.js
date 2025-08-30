@@ -28,6 +28,7 @@ const sessionRepository = require('./features/common/repositories/session');
 const modelStateService = require('./features/common/services/modelStateService');
 const featureBridge = require('./bridge/featureBridge');
 const windowBridge = require('./bridge/windowBridge');
+const ResearchBridge = require('./bridge/researchBridge');
 
 // Global variables
 const eventBridge = new EventEmitter();
@@ -200,6 +201,12 @@ app.whenReady().then(async () => {
 
         featureBridge.initialize();  // 추가: featureBridge 초기화
         windowBridge.initialize();
+        
+        // Initialize research functionality
+        const sqliteClient = require('./features/common/services/sqliteClient');
+        global.researchBridge = new ResearchBridge(ipcMain, sqliteClient);
+        console.log('[Main] Research functionality initialized');
+        
         setupWebDataHandlers();
 
         // Initialize Ollama models in database

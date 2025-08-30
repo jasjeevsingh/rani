@@ -47,11 +47,16 @@ function updateChildWindowLayouts(animated = true) {
     const visibleWindows = {};
     const listenWin = windowPool.get('listen');
     const askWin = windowPool.get('ask');
+    const researchWin = windowPool.get('research');
+    
     if (listenWin && !listenWin.isDestroyed() && listenWin.isVisible()) {
         visibleWindows.listen = true;
     }
     if (askWin && !askWin.isDestroyed() && askWin.isVisible()) {
         visibleWindows.ask = true;
+    }
+    if (researchWin && !researchWin.isDestroyed() && researchWin.isVisible()) {
+        visibleWindows.research = true;
     }
 
     if (Object.keys(visibleWindows).length === 0) return;
@@ -350,8 +355,41 @@ async function handleWindowVisibilityRequest(windowPool, layoutManager, movement
         return;
     }
 
-    if (name === 'listen' || name === 'ask') {
+    if (name === 'listen' || name === 'ask' || name === 'research') {
         const win = windowPool.get(name);
+        
+        if (name === 'research') {
+            // Research window is handled separately since it's larger
+            const targetLayout = layoutManager.calculateFeatureWindowLayout({ research: shouldBeVisible });
+            
+            if (shouldBeVisible) {
+                if (!win) return;
+                const targetBounds = targetLayout[name];
+                if (!targetBounds) return;
+
+                const startPos = { ...targetBounds };
+                startPos.y -= 20; // Slide down animation
+
+                win.setOpacity(0);
+                win.setBounds(startPos);
+                win.show();
+
+                movementManager.fade(win, { to: 1 });
+                movementManager.animateLayout(targetLayout);
+            } else {
+                if (!win || !win.isVisible()) return;
+
+                const currentBounds = win.getBounds();
+                const targetPos = { ...currentBounds };
+                targetPos.y -= 20; // Slide up animation
+
+                movementManager.fade(win, { to: 0, onComplete: () => win.hide() });
+                movementManager.animateWindowPosition(win, targetPos);
+            }
+            return;
+        }
+        
+        // Original listen/ask handling
         const otherName = name === 'listen' ? 'ask' : 'listen';
         const otherWin = windowPool.get(otherName);
         const isOtherWinVisible = otherWin && !otherWin.isDestroyed() && otherWin.isVisible();
@@ -522,6 +560,38 @@ function createFeatureWindows(header, namesToCreate) {
                 break;
             }
 
+            // research
+            case 'research': {
+                const research = new BrowserWindow({ ...commonChildOptions, width: 800 });
+                research.setContentProtection(isContentProtectionOn);
+                research.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+                if (process.platform === 'darwin') {
+                    research.setWindowButtonVisibility(false);
+                }
+                const researchLoadOptions = { query: { view: 'research' } };
+                if (!shouldUseLiquidGlass) {
+                    research.loadFile(path.join(__dirname, '../ui/app/content.html'), researchLoadOptions);
+                } else {
+                    researchLoadOptions.query.glass = 'true';
+                    research.loadFile(path.join(__dirname, '../ui/app/content.html'), researchLoadOptions);
+                    research.webContents.once('did-finish-load', () => {
+                        const viewId = liquidGlass.addView(research.getNativeWindowHandle());
+                        if (viewId !== -1) {
+                            liquidGlass.unstable_setVariant(viewId, liquidGlass.GlassMaterialVariant.bubbles);
+                            // liquidGlass.unstable_setScrim(viewId, 1);
+                            // liquidGlass.unstable_setSubdued(viewId, 1);
+                        }
+                    });
+                }
+                
+                // Open DevTools in development
+                if (!app.isPackaged) {
+                    research.webContents.openDevTools({ mode: 'detach' });
+                }
+                windowPool.set('research', research);
+                break;
+            }
+
             // settings
             case 'settings': {
                 const settings = new BrowserWindow({ ...commonChildOptions, width:240, maxHeight:400, parent:undefined });
@@ -603,13 +673,14 @@ function createFeatureWindows(header, namesToCreate) {
     } else {
         createFeatureWindow('listen');
         createFeatureWindow('ask');
+        createFeatureWindow('research');
         createFeatureWindow('settings');
         createFeatureWindow('shortcut-settings');
     }
 }
 
 function destroyFeatureWindows() {
-    const featureWindows = ['listen','ask','settings','shortcut-settings'];
+    const featureWindows = ['listen','ask','research','settings','shortcut-settings'];
     if (settingsHideTimer) {
         clearTimeout(settingsHideTimer);
         settingsHideTimer = null;
@@ -716,7 +787,7 @@ function createWindows() {
     setupWindowController(windowPool, layoutManager, movementManager);
 
     if (currentHeaderState === 'main') {
-        createFeatureWindows(header, ['listen', 'ask', 'settings', 'shortcut-settings']);
+        createFeatureWindows(header, ['listen', 'ask', 'research', 'settings', 'shortcut-settings']);
     }
 
     header.setContentProtection(isContentProtectionOn);
@@ -789,6 +860,15 @@ const handleHeaderStateChanged = (state) => {
     internalBridge.emit('reregister-shortcuts');
 };
 
+async function toggleResearchView() {
+    console.log('[WindowManager] Toggling research view');
+    
+    const researchWin = windowPool.get('research');
+    const isVisible = researchWin && !researchWin.isDestroyed() && researchWin.isVisible();
+    
+    internalBridge.emit('window:requestVisibility', { name: 'research', visible: !isVisible });
+}
+
 
 module.exports = {
     createWindows,
@@ -806,4 +886,5 @@ module.exports = {
     getHeaderPosition,
     moveHeaderTo,
     adjustWindowHeight,
+    toggleResearchView,
 };

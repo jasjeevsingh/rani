@@ -209,6 +209,10 @@ export class MainHeader extends LitElement {
             margin-left: 4px;
         }
 
+        .research-action {
+            margin-left: 4px;
+        }
+
         .action-button,
         .action-text {
             padding-bottom: 1px;
@@ -562,6 +566,18 @@ export class MainHeader extends LitElement {
         }
     }
 
+    async _handleResearchClick() {
+        if (this.wasJustDragged) return;
+
+        try {
+            if (window.api) {
+                await window.api.mainHeader.sendResearchButtonClick();
+            }
+        } catch (error) {
+            console.error('IPC invoke for research button failed:', error);
+        }
+    }
+
     async _handleToggleAllWindowsVisibility() {
         if (this.wasJustDragged) return;
 
@@ -648,6 +664,17 @@ export class MainHeader extends LitElement {
                     </div>
                     <div class="icon-container">
                         ${this.renderShortcut(this.shortcuts.nextStep)}
+                    </div>
+                </div>
+
+                <div class="header-actions research-action" @click=${() => this._handleResearchClick()}>
+                    <div class="action-text">
+                        <div class="action-text-content">Research</div>
+                    </div>
+                    <div class="icon-container">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5 1C3.34 1 2 2.34 2 4C2 5.66 3.34 7 5 7C5.76 7 6.44 6.72 6.97 6.25L10.36 9.64C10.55 9.83 10.86 9.83 11.05 9.64C11.24 9.45 11.24 9.14 11.05 8.95L7.66 5.56C8.13 5.03 8.41 4.35 8.41 3.59C8.41 1.93 7.07 0.59 5.41 0.59H5ZM5 2C6.11 2 7 2.89 7 4C7 5.11 6.11 6 5 6C3.89 6 3 5.11 3 4C3 2.89 3.89 2 5 2Z" fill="white"/>
+                        </svg>
                     </div>
                 </div>
 

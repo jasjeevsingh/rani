@@ -3,6 +3,7 @@ import { SettingsView } from '../settings/SettingsView.js';
 import { ListenView } from '../listen/ListenView.js';
 import { AskView } from '../ask/AskView.js';
 import { ShortcutSettingsView } from '../settings/ShortCutSettingsView.js';
+import { ResearchView } from '../research/ResearchView.js';
 
 import '../listen/audioCore/renderer.js';
 
@@ -23,7 +24,7 @@ export class RaniApp extends LitElement {
             height: 100%;
         }
 
-        ask-view, settings-view, history-view, help-view, setup-view {
+        ask-view, settings-view, history-view, help-view, setup-view, research-view {
             display: block;
             width: 100%;
             height: 100%;
@@ -123,12 +124,165 @@ export class RaniApp extends LitElement {
         }
     }
 
+    // Research event handlers
+    async handleSearchPapers(e) {
+        const { query } = e.detail;
+        try {
+            // Send search request to main process
+            if (window.api && window.api.research) {
+                const results = await window.api.research.searchPapers(query);
+                const researchView = this.shadowRoot.querySelector('research-view');
+                if (researchView) {
+                    researchView.updateSearchResults(results);
+                }
+            } else {
+                // Fallback to mock data if API not available
+                console.log('[RaniApp] Research API not available, using mock data');
+                this.handleSearchPapersStub(e);
+            }
+        } catch (error) {
+            console.error('Paper search failed:', error);
+            // Fallback to mock data on error
+            this.handleSearchPapersStub(e);
+        }
+    }
+
+    // Stub method for testing
+    async handleSearchPapersStub(e) {
+        const { query } = e.detail;
+        console.log('[RaniApp] Search papers:', query);
+        const mockResults = [
+            {
+                id: 'test-1',
+                title: 'Test Paper: ' + query,
+                authors: 'Test Author',
+                abstract: 'This is a test paper result for: ' + query,
+                year: 2024,
+                venue: 'Test Conference',
+                url: 'https://example.com',
+                citationCount: 10,
+                source: 'test'
+            }
+        ];
+        
+        const researchView = this.shadowRoot.querySelector('research-view');
+        if (researchView) {
+            researchView.updateSearchResults(mockResults);
+        }
+    }
+
+    async handleImportPaper(e) {
+        const { paper } = e.detail;
+        try {
+            if (window.api && window.api.research) {
+                await window.api.research.importPaper(paper);
+                // Refresh documents list
+                this.handleLoadDocuments();
+            } else {
+                console.log('[RaniApp] Import paper:', e.detail);
+            }
+        } catch (error) {
+            console.error('Paper import failed:', error);
+        }
+    }
+
+    async handleUploadDocument(e) {
+        try {
+            if (window.api && window.api.documents) {
+                await window.api.documents.selectAndUpload();
+                // Refresh documents list
+                this.handleLoadDocuments();
+            } else {
+                console.log('[RaniApp] Upload document');
+            }
+        } catch (error) {
+            console.error('Document upload failed:', error);
+        }
+    }
+
+    async handleFilesDropped(e) {
+        const { files } = e.detail;
+        try {
+            if (window.api && window.api.documents) {
+                for (const file of files) {
+                    if (file.type === 'application/pdf') {
+                        await window.api.documents.uploadFile(file.path);
+                    }
+                }
+                // Refresh documents list
+                this.handleLoadDocuments();
+            } else {
+                console.log('[RaniApp] Files dropped:', e.detail);
+            }
+        } catch (error) {
+            console.error('File drop failed:', error);
+        }
+    }
+
+    async handleLoadDocuments(e) {
+        try {
+            if (window.api && window.api.documents) {
+                const documents = await window.api.documents.getUserDocuments();
+                const researchView = this.shadowRoot.querySelector('research-view');
+                if (researchView) {
+                    researchView.updateDocuments(documents);
+                }
+            } else {
+                // Fallback to mock data
+                console.log('[RaniApp] Load documents');
+                const mockDocuments = [
+                    {
+                        id: 'doc-1',
+                        filename: 'Test Paper.pdf',
+                        uploaded_at: Math.floor(Date.now() / 1000),
+                        file_size: 1024000
+                    }
+                ];
+                
+                const researchView = this.shadowRoot.querySelector('research-view');
+                if (researchView) {
+                    researchView.updateDocuments(mockDocuments);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load documents:', error);
+        }
+    }
+
+    handleDocumentSelected(e) {
+        const { document } = e.detail;
+        console.log('Document selected:', document);
+        // Handle document selection (e.g., show in sidebar)
+    }
+
+    async handleOpenDocument(e) {
+        const { document } = e.detail;
+        try {
+            if (window.api && window.api.documents) {
+                await window.api.documents.openDocument(document.id);
+            } else {
+                console.log('[RaniApp] Open document:', e.detail);
+            }
+        } catch (error) {
+            console.error('Failed to open document:', error);
+        }
+    }
+
 
 
 
     render() {
         switch (this.currentView) {
             case 'research':
+                return html`<research-view
+                    @search-papers=${this.handleSearchPapers}
+                    @import-paper=${this.handleImportPaper}
+                    @upload-document=${this.handleUploadDocument}
+                    @files-dropped=${this.handleFilesDropped}
+                    @load-documents=${this.handleLoadDocuments}
+                    @document-selected=${this.handleDocumentSelected}
+                    @open-document=${this.handleOpenDocument}
+                ></research-view>`;
             case 'listen':
                 return html`<listen-view
                     .currentResponseIndex=${this.currentResponseIndex}
