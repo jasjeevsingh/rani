@@ -202,6 +202,18 @@ app.whenReady().then(async () => {
         featureBridge.initialize();  // 추가: featureBridge 초기화
         windowBridge.initialize();
         
+        // Initialize TTS service
+        try {
+            const TTSService = require('./features/voice/textToSpeech');
+            console.log('[Main] TTSService imported:', typeof TTSService);
+            const ttsService = new TTSService(modelStateService);
+            global.ttsService = ttsService;
+            console.log('[Main] TTS service initialized');
+        } catch (ttsError) {
+            console.error('[Main] TTS service initialization failed:', ttsError);
+            // Continue without TTS - it will fallback to Web Speech API
+        }
+        
         // Initialize research functionality
         const sqliteClient = require('./features/common/services/sqliteClient');
         global.researchBridge = new ResearchBridge(ipcMain, sqliteClient);

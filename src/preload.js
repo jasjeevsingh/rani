@@ -154,12 +154,32 @@ contextBridge.exposeInMainWorld('api', {
     // Message Handling
     sendMessage: (text) => ipcRenderer.invoke('ask:sendQuestionFromAsk', text),
 
+    // Voice Input
+    startVoiceInput: () => ipcRenderer.invoke('ask:startVoiceInput'),
+    stopVoiceInput: () => ipcRenderer.invoke('ask:stopVoiceInput'),
+    toggleVoiceInput: () => ipcRenderer.invoke('ask:toggleVoiceInput'),
+    sendAudioData: (data, mimeType) => ipcRenderer.invoke('ask:sendAudioData', { data, mimeType }),
+
     // Listeners
     onAskStateUpdate: (callback) => ipcRenderer.on('ask:stateUpdate', callback),
     removeOnAskStateUpdate: (callback) => ipcRenderer.removeListener('ask:stateUpdate', callback),
 
     onAskStreamError: (callback) => ipcRenderer.on('ask-response-stream-error', callback),
     removeOnAskStreamError: (callback) => ipcRenderer.removeListener('ask-response-stream-error', callback),
+
+    // Voice/STT Listeners
+    onSttUpdate: (callback) => ipcRenderer.on('ask:sttUpdate', callback),
+    removeOnSttUpdate: (callback) => ipcRenderer.removeListener('ask:sttUpdate', callback),
+    onSttComplete: (callback) => ipcRenderer.on('ask:sttComplete', callback),
+    removeOnSttComplete: (callback) => ipcRenderer.removeListener('ask:sttComplete', callback),
+    onSttStatus: (callback) => ipcRenderer.on('ask:sttStatus', callback),
+    removeOnSttStatus: (callback) => ipcRenderer.removeListener('ask:sttStatus', callback),
+    onSttError: (callback) => ipcRenderer.on('ask:sttError', callback),
+    removeOnSttError: (callback) => ipcRenderer.removeListener('ask:sttError', callback),
+
+    // Conversational response for TTS
+    onConversationalResponse: (callback) => ipcRenderer.on('ask:conversationalResponse', callback),
+    removeOnConversationalResponse: (callback) => ipcRenderer.removeListener('ask:conversationalResponse', callback),
 
     // Listeners
     onShowTextInput: (callback) => ipcRenderer.on('ask:showTextInput', callback),
@@ -380,5 +400,46 @@ contextBridge.exposeInMainWorld('api', {
     // Get user's imported papers
     getUserPapers: (limit = 50) => 
       ipcRenderer.invoke('research:getUserPapers', limit)
+  },
+
+  // Voice/TTS API
+  voice: {
+    // Speak text using OpenAI TTS
+    speakWithOpenAI: (text, options = {}) => ipcRenderer.invoke('voice:speakWithOpenAI', text, options),
+    
+    // Play audio from base64 encoded data
+    playAudio: async (base64Audio) => {
+      return new Promise((resolve, reject) => {
+        try {
+          // Decode base64 to audio data
+          const audioData = atob(base64Audio);
+          const arrayBuffer = new ArrayBuffer(audioData.length);
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          for (let i = 0; i < audioData.length; i++) {
+            uint8Array[i] = audioData.charCodeAt(i);
+          }
+          
+          // Create blob and play audio
+          const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+          const audioUrl = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrl);
+          
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            resolve();
+          };
+          
+          audio.onerror = (error) => {
+            URL.revokeObjectURL(audioUrl);
+            reject(error);
+          };
+          
+          audio.play();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
   }
 });

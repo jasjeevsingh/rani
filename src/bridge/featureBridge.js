@@ -9,6 +9,7 @@ const shortcutsService = require('../features/shortcuts/shortcutsService');
 const presetRepository = require('../features/common/repositories/preset');
 const localAIManager = require('../features/common/services/localAIManager');
 const askService = require('../features/ask/askService');
+const VOICE_CONFIG = require('../features/voice/voiceConfig');
 const listenService = require('../features/listen/listenService');
 const permissionService = require('../features/common/services/permissionService');
 const encryptionService = require('../features/common/services/encryptionService');
@@ -83,6 +84,10 @@ module.exports = {
     ipcMain.handle('ask:sendQuestionFromSummary', async (event, userPrompt) => await askService.sendMessage(userPrompt));
     ipcMain.handle('ask:toggleAskButton', async () => await askService.toggleAskButton());
     ipcMain.handle('ask:closeAskWindow',  async () => await askService.closeAskWindow());
+    ipcMain.handle('ask:startVoiceInput', async () => await askService.startVoiceInput());
+    ipcMain.handle('ask:stopVoiceInput', async () => await askService.stopVoiceInput());
+    ipcMain.handle('ask:toggleVoiceInput', async () => await askService.toggleVoiceInput());
+    ipcMain.handle('ask:sendAudioData', async (event, { data, mimeType }) => await askService.sendAudioData(data, mimeType));
     
     // Research
     ipcMain.handle('research:toggleResearchView', async () => {
@@ -233,6 +238,32 @@ module.exports = {
     // 전체 상태 조회
     ipcMain.handle('localai:get-all-states', async (event) => {
       return await localAIManager.getAllServiceStates();
+    });
+
+    // Voice/TTS handlers
+    ipcMain.handle('voice:speakWithOpenAI', async (event, text, options = {}) => {
+      try {
+        const ttsService = global.ttsService;
+        if (!ttsService) {
+          console.warn('[FeatureBridge] TTS service not available, falling back to Web Speech API');
+          return { success: false, error: 'TTS service not initialized', fallback: true };
+        }
+        
+        console.log(`[FeatureBridge] Speaking with OpenAI TTS: "${text.substring(0, 50)}..."`);
+        
+        const result = await ttsService.speak(text, {
+          voice: options.voice || VOICE_CONFIG.defaultVoice,
+          model: options.model || VOICE_CONFIG.model,
+          speed: options.speed || VOICE_CONFIG.speed,
+          interrupt: true,
+          cache: true
+        });
+        
+        return { success: true, result };
+      } catch (error) {
+        console.error('[FeatureBridge] OpenAI TTS error:', error);
+        return { success: false, error: error.message, fallback: true };
+      }
     });
 
     console.log('[FeatureBridge] Initialized with all feature handlers.');

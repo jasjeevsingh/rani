@@ -1,5 +1,7 @@
 import { html, css, LitElement } from '../../ui/assets/lit-core-2.7.4.min.js';
 import { parser, parser_write, parser_end, default_renderer } from '../../ui/assets/smd.js';
+import './askAudioCapture.js';
+import '../ask/askAudioCapture.js';
 
 export class AskView extends LitElement {
     static properties = {
@@ -14,6 +16,10 @@ export class AskView extends LitElement {
         headerText: { type: String },
         headerAnimating: { type: Boolean },
         isStreaming: { type: Boolean },
+        isListening: { type: Boolean },
+        sttTranscription: { type: String },
+        voiceActivity: { type: Boolean },
+        conversationalResponse: { type: String },
     };
 
     static styles = css`
@@ -709,6 +715,96 @@ export class AskView extends LitElement {
         .header-clear-btn:hover .icon-box {
             background-color: rgba(255,255,255,0.18);
         }
+
+        .mic-button {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            margin-right: 8px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mic-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .mic-button.listening {
+            background: rgba(220, 38, 38, 0.2);
+            border-color: rgba(239, 68, 68, 0.6);
+            animation: pulse 2s infinite;
+        }
+
+        .mic-button.listening:hover {
+            background: rgba(220, 38, 38, 0.3);
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .mic-button svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+            position: relative;
+            z-index: 2;
+        }
+
+        .mic-button.listening svg {
+            color: rgb(239, 68, 68);
+        }
+
+        /* Voice activity indicator */
+        .voice-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.3);
+            transform: translate(-50%, -50%) scale(0);
+            transition: transform 0.1s ease-out;
+            z-index: 1;
+        }
+
+        .mic-button.listening .voice-indicator.active {
+            transform: translate(-50%, -50%) scale(1);
+            animation: voiceActivity 0.3s ease-out;
+        }
+
+        @keyframes voiceActivity {
+            0% {
+                transform: translate(-50%, -50%) scale(0.8);
+                background: rgba(239, 68, 68, 0.5);
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.1);
+                background: rgba(239, 68, 68, 0.7);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                background: rgba(239, 68, 68, 0.3);
+            }
+        }
     `;
 
     constructor() {
@@ -721,11 +817,19 @@ export class AskView extends LitElement {
         this.headerText = 'AI Response';
         this.headerAnimating = false;
         this.isStreaming = false;
+        this.isListening = false;
+        this.sttTranscription = '';
+        this.voiceActivity = false;
+        this.conversationalResponse = '';
 
         this.marked = null;
         this.hljs = null;
         this.DOMPurify = null;
         this.isLibrariesLoaded = false;
+
+        // TTS (Text-to-Speech) for conversational responses
+        this.speechSynthesis = window.speechSynthesis;
+        this.currentUtterance = null;
 
         // SMD.js streaming markdown parser
         this.smdParser = null;
@@ -740,6 +844,7 @@ export class AskView extends LitElement {
         this.handleScroll = this.handleScroll.bind(this);
         this.handleCloseAskWindow = this.handleCloseAskWindow.bind(this);
         this.handleCloseIfNoContent = this.handleCloseIfNoContent.bind(this);
+        this.handleMicClick = this.handleMicClick.bind(this);
 
         this.loadLibraries();
 
@@ -791,6 +896,9 @@ export class AskView extends LitElement {
                 this.currentQuestion = newState.currentQuestion;
                 this.isLoading       = newState.isLoading;
                 this.isStreaming     = newState.isStreaming;
+                this.isListening     = newState.isListening || false;
+                this.sttTranscription = newState.sttTranscription || '';
+                this.conversationalResponse = newState.conversationalResponse || '';
               
                 const wasHidden = !this.showTextInput;
                 this.showTextInput = newState.showTextInput;
@@ -803,6 +911,47 @@ export class AskView extends LitElement {
                   }
                 }
               });
+
+            // STT event listeners
+            window.api.askView.onSttUpdate((event, data) => {
+                this.sttTranscription = data.text || '';
+                this.isListening = data.isListening;
+                // Trigger voice activity indicator when text is being transcribed
+                this.voiceActivity = data.text && data.text.length > 0 && !data.isFinal;
+                this.requestUpdate();
+            });
+
+            window.api.askView.onSttComplete((event, data) => {
+                this.sttTranscription = '';
+                this.isListening = false;
+                this.voiceActivity = false;
+                if (window.askAudioCapture) {
+                    window.askAudioCapture.stopCapture();
+                }
+                this.requestUpdate();
+            });
+
+            window.api.askView.onSttStatus((event, data) => {
+                console.log('[AskView] STT status:', data.status);
+            });
+
+            window.api.askView.onSttError((event, data) => {
+                console.error('[AskView] STT error:', data.error);
+                this.isListening = false;
+                this.sttTranscription = '';
+                this.voiceActivity = false;
+                if (window.askAudioCapture) {
+                    window.askAudioCapture.stopCapture();
+                }
+                this.requestUpdate();
+            });
+
+            // Conversational response for TTS
+            window.api.askView.onConversationalResponse((event, data) => {
+                console.log('[AskView] Received conversational response for TTS');
+                this.speakConversationalResponse(data.text);
+            });
+
             console.log('AskView: IPC 이벤트 리스너 등록 완료');
         }
     }
@@ -829,11 +978,15 @@ export class AskView extends LitElement {
 
         Object.values(this.lineCopyTimeouts).forEach(timeout => clearTimeout(timeout));
 
+        // Stop any playing speech
+        this.stopSpeaking();
+
         if (window.api) {
             window.api.askView.removeOnAskStateUpdate(this.handleAskStateUpdate);
             window.api.askView.removeOnShowTextInput(this.handleShowTextInput);
             window.api.askView.removeOnScrollResponseUp(this.handleScroll);
             window.api.askView.removeOnScrollResponseDown(this.handleScroll);
+            window.api.askView.removeOnConversationalResponse();
             console.log('✅ AskView: IPC 이벤트 리스너 제거 필요');
         }
     }
@@ -918,11 +1071,18 @@ export class AskView extends LitElement {
         this.currentQuestion = '';
         this.isLoading = false;
         this.isStreaming = false;
+        this.isListening = false;
+        this.sttTranscription = '';
+        this.voiceActivity = false;
+        this.conversationalResponse = '';
         this.headerText = 'AI Response';
         this.showTextInput = true;
         this.lastProcessedLength = 0;
         this.smdParser = null;
         this.smdContainer = null;
+        
+        // Stop any playing speech
+        this.stopSpeaking();
     }
 
     handleInputFocus() {
@@ -1283,6 +1443,147 @@ export class AskView extends LitElement {
         }
     }
 
+    async handleMicClick() {
+        try {
+            if (this.isListening) {
+                // Stop voice input
+                await window.api.askView.stopVoiceInput();
+                if (window.askAudioCapture) {
+                    window.askAudioCapture.stopCapture();
+                }
+            } else {
+                // Start voice input
+                const result = await window.api.askView.startVoiceInput();
+                if (result.success) {
+                    // Start audio capture
+                    if (window.askAudioCapture) {
+                        const captureStarted = await window.askAudioCapture.startCapture();
+                        if (!captureStarted) {
+                            console.error('[AskView] Failed to start audio capture');
+                            await window.api.askView.stopVoiceInput();
+                        }
+                    }
+                } else {
+                    console.error('[AskView] Failed to start voice input:', result.error);
+                }
+            }
+        } catch (error) {
+            console.error('[AskView] Error handling mic click:', error);
+        }
+    }
+
+    /**
+     * Update voice activity indicator based on microphone input
+     */
+    updateVoiceActivity(isActive) {
+        if (this.voiceActivity !== isActive) {
+            this.voiceActivity = isActive;
+            this.requestUpdate();
+        }
+    }
+
+    /**
+     * Speak the conversational response using OpenAI TTS
+     */
+    async speakConversationalResponse(text) {
+        try {
+            // Stop any currently playing speech
+            this.stopSpeaking();
+
+            if (!text || text.trim().length === 0) {
+                console.warn('[AskView] No text to speak');
+                return;
+            }
+
+            console.log('[AskView] Attempting to use OpenAI TTS for conversational response');
+            
+            // Try to use TTS service from main process
+            const result = await window.api.voice.speakWithOpenAI(text, {
+                voice: 'nova', // Change this to match your desired voice
+                model: 'tts-1',
+                speed: 1.4, // Speed multiplier (1.0 = normal speed)
+                pitch: 2.0, // Pitch multiplier (1.0 = normal pitch)
+                volume: 0.8 // Volume multiplier (0.0 to 1.0)
+            });
+            
+            if (result.success) {
+                console.log('[AskView] OpenAI TTS completed successfully');
+            } else if (result.fallback) {
+                console.log('[AskView] OpenAI TTS not available, falling back to Web Speech API');
+                this.speakWithWebSpeechAPI(text);
+            } else {
+                throw new Error(result.error);
+            }
+            
+        } catch (error) {
+            console.error('[AskView] Error in OpenAI TTS:', error);
+            
+            // Fallback to Web Speech API
+            console.log('[AskView] Falling back to Web Speech API');
+            this.speakWithWebSpeechAPI(text);
+        }
+    }
+
+    /**
+     * Fallback method using Web Speech API
+     */
+    speakWithWebSpeechAPI(text) {
+        try {
+            // Create speech utterance
+            this.currentUtterance = new SpeechSynthesisUtterance(text);
+            
+            // Configure speech settings
+            this.currentUtterance.rate = 1.0;
+            this.currentUtterance.pitch = 1.0;
+            this.currentUtterance.volume = 0.8;
+
+            // Try to use a more natural voice if available
+            const voices = this.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(voice => 
+                voice.name.includes('Samantha') || // macOS
+                voice.name.includes('Zira') ||     // Windows
+                voice.name.includes('Google') ||   // Chrome
+                voice.lang.startsWith('en')
+            );
+            
+            if (preferredVoice) {
+                this.currentUtterance.voice = preferredVoice;
+            }
+
+            // Event handlers
+            this.currentUtterance.onstart = () => {
+                console.log('[AskView] Web Speech API started speaking');
+            };
+
+            this.currentUtterance.onend = () => {
+                console.log('[AskView] Web Speech API finished speaking');
+                this.currentUtterance = null;
+            };
+
+            this.currentUtterance.onerror = (event) => {
+                console.error('[AskView] Web Speech API error:', event.error);
+                this.currentUtterance = null;
+            };
+
+            // Speak using Web Speech API
+            this.speechSynthesis.speak(this.currentUtterance);
+            console.log('[AskView] Web Speech API speaking conversational response');
+
+        } catch (error) {
+            console.error('[AskView] Error in Web Speech API fallback:', error);
+        }
+    }
+
+    /**
+     * Stop any currently playing speech
+     */
+    stopSpeaking() {
+        if (this.speechSynthesis && this.speechSynthesis.speaking) {
+            this.speechSynthesis.cancel();
+        }
+        this.currentUtterance = null;
+    }
+
     handleTextKeydown(e) {
         // Fix for IME composition issue: Ignore Enter key presses while composing.
         if (e.isComposing) {
@@ -1382,22 +1683,50 @@ export class AskView extends LitElement {
 
                 <!-- Text Input Container -->
                 <div class="text-input-container ${!hasResponse ? 'no-response' : ''} ${!this.showTextInput ? 'hidden' : ''}">
-                    <input
-                        type="text"
-                        id="textInput"
-                        placeholder="Ask about your screen or audio"
-                        @keydown=${this.handleTextKeydown}
-                        @focus=${this.handleInputFocus}
-                    />
-                    <button
-                        class="submit-btn"
-                        @click=${this.handleSendText}
-                    >
-                        <span class="btn-label">Submit</span>
-                        <span class="btn-icon">
-                            ↵
-                        </span>
-                    </button>
+                    <div style="display: flex; align-items: center; width: 100%;">
+                        <!-- Microphone Button -->
+                        <button
+                            class="mic-button ${this.isListening ? 'listening' : ''}"
+                            @click=${this.handleMicClick}
+                            title="${this.isListening ? 'Stop voice input' : 'Start voice input'}"
+                        >
+                            <!-- Voice activity indicator -->
+                            <div class="voice-indicator ${this.voiceActivity ? 'active' : ''}"></div>
+                            
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                ${this.isListening ? html`
+                                    <!-- Stop/Square icon when listening -->
+                                    <rect x="6" y="6" width="12" height="12" rx="2"/>
+                                ` : html`
+                                    <!-- Microphone icon when not listening -->
+                                    <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                                    <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                                    <line x1="12" y1="19" x2="12" y2="23"/>
+                                    <line x1="8" y1="23" x2="16" y2="23"/>
+                                `}
+                            </svg>
+                        </button>
+
+                        <input
+                            type="text"
+                            id="textInput"
+                            placeholder="${this.isListening ? 'Listening...' : 'Ask about your screen or audio'}"
+                            @keydown=${this.handleTextKeydown}
+                            @focus=${this.handleInputFocus}
+                            ?disabled=${this.isListening}
+                            style="flex: 1;"
+                        />
+                        <button
+                            class="submit-btn"
+                            @click=${this.handleSendText}
+                            ?disabled=${this.isListening}
+                        >
+                            <span class="btn-label">Submit</span>
+                            <span class="btn-icon">
+                                ↵
+                            </span>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;

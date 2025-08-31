@@ -3,6 +3,7 @@ const { createStreamingLLM } = require('../common/ai/factory');
 // Lazy require helper to avoid circular dependency issues
 const getWindowManager = () => require('../../window/windowManager');
 const internalBridge = require('../../bridge/internalBridge');
+const AskSttService = require('./stt/askSttService');
 
 const getWindowPool = () => {
     try {
@@ -132,9 +133,80 @@ class AskService {
             isStreaming: false,
             currentQuestion: '',
             currentResponse: '',
+            conversationalResponse: '', // New conversational response for TTS
             showTextInput: true,
+            isListening: false,
+            sttTranscription: '',
         };
+        
+        // Initialize STT service
+        this.sttService = new AskSttService();
+        this.setupSttCallbacks();
+        
+        // Initialize STT service
+        this.sttService = new AskSttService();
+        this.setupSttCallbacks();
+        
         console.log('[AskService] Service instance created.');
+    }
+
+    setupSttCallbacks() {
+        this.sttService.setCallbacks({
+            onTranscriptionUpdate: (text, isFinal) => {
+                this.state.sttTranscription = text;
+                this._broadcastState();
+                
+                // Send transcription update to the ask window
+                const askWindow = getWindowPool()?.get('ask');
+                if (askWindow && !askWindow.isDestroyed()) {
+                    askWindow.webContents.send('ask:sttUpdate', { 
+                        text, 
+                        isFinal,
+                        isListening: this.state.isListening 
+                    });
+                }
+            },
+            onTranscriptionComplete: (text) => {
+                console.log('[AskService] STT transcription complete:', text);
+                this.state.sttTranscription = text;
+                this.state.isListening = false;
+                this._broadcastState();
+                
+                // Auto-submit the transcribed text
+                if (text.trim()) {
+                    this.sendMessage(text.trim());
+                }
+                
+                // Send completion to the ask window
+                const askWindow = getWindowPool()?.get('ask');
+                if (askWindow && !askWindow.isDestroyed()) {
+                    askWindow.webContents.send('ask:sttComplete', { 
+                        text,
+                        isListening: false 
+                    });
+                }
+            },
+            onStatusUpdate: (status) => {
+                console.log('[AskService] STT status update:', status);
+                const askWindow = getWindowPool()?.get('ask');
+                if (askWindow && !askWindow.isDestroyed()) {
+                    askWindow.webContents.send('ask:sttStatus', { status });
+                }
+            },
+            onError: (error) => {
+                console.error('[AskService] STT error:', error);
+                this.state.isListening = false;
+                this._broadcastState();
+                
+                const askWindow = getWindowPool()?.get('ask');
+                if (askWindow && !askWindow.isDestroyed()) {
+                    askWindow.webContents.send('ask:sttError', { 
+                        error: error.message || 'Speech recognition error',
+                        isListening: false 
+                    });
+                }
+            }
+        });
     }
 
     _broadcastState() {
@@ -180,6 +252,11 @@ class AskService {
                 this.abortController.abort('Window closed by user');
                 this.abortController = null;
             }
+
+            // Stop any active STT session
+            if (this.state.isListening) {
+                await this.stopVoiceInput();
+            }
     
             this.state = {
                 isVisible      : false,
@@ -187,7 +264,10 @@ class AskService {
                 isStreaming    : false,
                 currentQuestion: '',
                 currentResponse: '',
+                conversationalResponse: '',
                 showTextInput  : true,
+                isListening    : false,
+                sttTranscription: '',
             };
             this._broadcastState();
     
@@ -233,8 +313,10 @@ class AskService {
         this.abortController = new AbortController();
         const { signal } = this.abortController;
 
-
         let sessionId;
+        
+        // Check if we're in voice mode for parallel conversational response
+        const isVoiceMode = this.state.isListening || this.state.sttTranscription;
 
         try {
             console.log(`[AskService] 🤖 Processing message: ${userPrompt.substring(0, 50)}...`);
@@ -251,6 +333,13 @@ class AskService {
 
             const screenshotResult = await captureScreenshot({ quality: 'medium' });
             const screenshotBase64 = screenshotResult.success ? screenshotResult.base64 : null;
+
+            // Start parallel conversational response generation if in voice mode
+            let conversationalPromise = null;
+            if (isVoiceMode) {
+                console.log('[AskService] Starting parallel conversational response generation...');
+                conversationalPromise = this._generateConversationalResponseInParallel(userPrompt, modelInfo, screenshotBase64);
+            }
 
             const conversationHistory = this._formatConversationForPrompt(conversationHistoryRaw);
 
@@ -299,6 +388,30 @@ class AskService {
                 });
 
                 await this._processStream(reader, askWin, sessionId, signal);
+                
+                // Handle parallel conversational response if it was started
+                if (conversationalPromise) {
+                    try {
+                        const conversationalResponse = await conversationalPromise;
+                        if (conversationalResponse) {
+                            this.state.conversationalResponse = conversationalResponse;
+                            this._broadcastState();
+                            
+                            console.log('[AskService] Generated parallel conversational response for TTS');
+                            
+                            // Send conversational response to ask window for TTS
+                            if (askWin && !askWin.isDestroyed()) {
+                                askWin.webContents.send('ask:conversationalResponse', {
+                                    text: conversationalResponse,
+                                    originalResponse: this.state.currentResponse
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error('[AskService] Error in parallel conversational response:', error);
+                    }
+                }
+                
                 return { success: true };
 
             } catch (multimodalError) {
@@ -414,8 +527,9 @@ class AskService {
             this.state.isStreaming = false;
             this.state.currentResponse = fullResponse;
             this._broadcastState();
+            
             if (fullResponse) {
-                 try {
+                try {
                     await askRepository.addAiMessage({ sessionId, role: 'assistant', content: fullResponse });
                     console.log(`[AskService] DB: Saved partial or full assistant response to session ${sessionId} after stream ended.`);
                 } catch(dbError) {
@@ -441,6 +555,180 @@ class AskService {
             errorMessage.includes('invalid') ||
             errorMessage.includes('not supported')
         );
+    }
+
+    /**
+     * Start voice input/speech-to-text for the ask window
+     */
+    async startVoiceInput() {
+        try {
+            if (this.state.isListening) {
+                console.warn('[AskService] Voice input already active');
+                return { success: false, error: 'Already listening' };
+            }
+
+            // Initialize STT session if not already done
+            const initialized = await this.sttService.initializeSession();
+            if (!initialized) {
+                return { success: false, error: 'Failed to initialize speech recognition' };
+            }
+
+            await this.sttService.startListening();
+            this.state.isListening = true;
+            this.state.sttTranscription = '';
+            this._broadcastState();
+
+            console.log('[AskService] Voice input started');
+            return { success: true };
+        } catch (error) {
+            console.error('[AskService] Error starting voice input:', error);
+            this.state.isListening = false;
+            this._broadcastState();
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Stop voice input/speech-to-text
+     */
+    async stopVoiceInput() {
+        try {
+            if (!this.state.isListening) {
+                console.warn('[AskService] Voice input not active');
+                return { success: false, error: 'Not listening' };
+            }
+
+            await this.sttService.stopListening();
+            this.state.isListening = false;
+            this._broadcastState();
+
+            console.log('[AskService] Voice input stopped');
+            return { success: true };
+        } catch (error) {
+            console.error('[AskService] Error stopping voice input:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Send audio data to STT service
+     */
+    async sendAudioData(data, mimeType) {
+        try {
+            if (!this.state.isListening) {
+                return { success: false, error: 'Not listening for voice input' };
+            }
+
+            await this.sttService.sendAudioData(data, mimeType);
+            return { success: true };
+        } catch (error) {
+            console.error('[AskService] Error sending audio data:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Generate conversational response in parallel (for simultaneous TTS)
+     */
+    async _generateConversationalResponseInParallel(userPrompt, modelInfo, screenshotBase64 = null) {
+        try {
+            const conversationalPrompt = `You are RANI (pronounced rah-nee), an AI research colleague and collaborator. Your style is like a young woman in her twenties: sharp and enthusiastic with the mind of an expert professor.
+Take the following detailed response and rewrite it so it sounds like youre explaining it out loud in conversation.
+
+User question: "${userPrompt}"
+
+Instructions:
+ - You are collaborator, not just an assistant. Think of how you'd explain complex ideas to a peer.
+ - Keep all important information and key points.
+ - Use "I" when referring to your perspective as a colleague, perhaps looking over my screen or work. 
+ - Use natural speech patterns: contractions, small asides, casual transitions (like "so", "basically", "the cool thing is…").
+ - Balance clarity with energy: approachable, but not sloppy.
+ - Keep your responses concise, to the point, but engaging. 2-5 sentences max. If the topic is complex, ask permission to keep going.
+ - Avoid bullet points and heavy formatting; make it continuous and flowing.
+ - Use natural turns of phrase (e.g., "That means...", "In other words...").
+ - Tone: warm, smart, a little playful, witty, but grounded in expertise.
+ - Think Friday from Iron Man and the Avengers.
+
+Conversational response:`;
+
+            const messages = [
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: conversationalPrompt },
+                    ],
+                }
+            ];
+
+            // Include screenshot if available (same as main response)
+            if (screenshotBase64) {
+                messages[0].content.push({
+                    type: 'image_url',
+                    image_url: { url: `data:image/jpeg;base64,${screenshotBase64}` },
+                });
+            }
+
+            const streamingLLM = createStreamingLLM(modelInfo.provider, {
+                apiKey: modelInfo.apiKey,
+                model: modelInfo.model,
+                temperature: 0.7,
+                maxTokens: 300, // Shorter for conversational response
+                usePortkey: modelInfo.provider === 'openai-glass',
+                portkeyVirtualKey: modelInfo.provider === 'openai-glass' ? modelInfo.apiKey : undefined,
+            });
+
+            const response = await streamingLLM.streamChat(messages);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let conversationalResponse = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.substring(6);
+                        if (data === '[DONE]') {
+                            break;
+                        }
+                        try {
+                            const json = JSON.parse(data);
+                            const token = json.choices[0]?.delta?.content || '';
+                            if (token) {
+                                conversationalResponse += token;
+                            }
+                        } catch (error) {
+                            // Skip invalid JSON
+                        }
+                    }
+                }
+            }
+
+            return conversationalResponse.trim();
+        } catch (error) {
+            console.error('[AskService] Error generating parallel conversational response:', error);
+            // Fallback: return a simple response
+            return `I'll help you with that.`;
+        }
+    }
+
+    /**
+     * Toggle voice input on/off
+     */
+
+    /**
+     * Toggle voice input on/off
+     */
+    async toggleVoiceInput() {
+        if (this.state.isListening) {
+            return await this.stopVoiceInput();
+        } else {
+            return await this.startVoiceInput();
+        }
     }
 
 }
