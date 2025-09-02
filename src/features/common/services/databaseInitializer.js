@@ -11,15 +11,15 @@ class DatabaseInitializer {
         // 최종적으로 사용될 DB 경로 (쓰기 가능한 위치)
         const userDataPath = app.getPath('userData');
         // In both development and production mode, the database is stored in the userData directory:
-        //   macOS: ~/Library/Application Support/Glass/pickleglass.db
-        //   Windows: %APPDATA%\Glass\pickleglass.db
-        this.dbPath = path.join(userDataPath, 'pickleglass.db');
+        //   macOS: ~/Library/Application Support/RANI/rani.db
+        //   Windows: %APPDATA%\RANI\rani.db
+        this.dbPath = path.join(userDataPath, 'rani.db');
         this.dataDir = userDataPath;
 
         // The original DB path (read-only location in the package)
         this.sourceDbPath = app.isPackaged
-            ? path.join(process.resourcesPath, 'data', 'pickleglass.db')
-            : path.join(app.getAppPath(), 'data', 'pickleglass.db');
+            ? path.join(process.resourcesPath, 'data', 'rani.db')
+            : path.join(app.getAppPath(), 'data', 'rani.db');
     }
 
     ensureDatabaseExists() {

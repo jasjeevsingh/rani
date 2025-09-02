@@ -613,17 +613,17 @@ export class AskView extends LitElement {
             gap: 4px;
         }
 
-        /* ────────────────[ GLASS BYPASS ]─────────────── */
-        :host-context(body.has-glass) .ask-container,
-        :host-context(body.has-glass) .response-header,
-        :host-context(body.has-glass) .response-icon,
-        :host-context(body.has-glass) .copy-button,
-        :host-context(body.has-glass) .close-button,
-        :host-context(body.has-glass) .line-copy-button,
-        :host-context(body.has-glass) .text-input-container,
-        :host-context(body.has-glass) .response-container pre,
-        :host-context(body.has-glass) .response-container p code,
-        :host-context(body.has-glass) .response-container pre code {
+        /* ────────────────[ RANI BYPASS ]─────────────── */
+        :host-context(body.has-rani) .ask-container,
+        :host-context(body.has-rani) .response-header,
+        :host-context(body.has-rani) .response-icon,
+        :host-context(body.has-rani) .copy-button,
+        :host-context(body.has-rani) .close-button,
+        :host-context(body.has-rani) .line-copy-button,
+        :host-context(body.has-rani) .text-input-container,
+        :host-context(body.has-rani) .response-container pre,
+        :host-context(body.has-rani) .response-container p code,
+        :host-context(body.has-rani) .response-container pre code {
             background: transparent !important;
             border: none !important;
             outline: none !important;
@@ -632,20 +632,20 @@ export class AskView extends LitElement {
             backdrop-filter: none !important;
         }
 
-        :host-context(body.has-glass) .ask-container::before {
+        :host-context(body.has-rani) .ask-container::before {
             display: none !important;
         }
 
-        :host-context(body.has-glass) .copy-button:hover,
-        :host-context(body.has-glass) .close-button:hover,
-        :host-context(body.has-glass) .line-copy-button,
-        :host-context(body.has-glass) .line-copy-button:hover,
-        :host-context(body.has-glass) .response-line:hover {
+        :host-context(body.has-rani) .copy-button:hover,
+        :host-context(body.has-rani) .close-button:hover,
+        :host-context(body.has-rani) .line-copy-button,
+        :host-context(body.has-rani) .line-copy-button:hover,
+        :host-context(body.has-rani) .response-line:hover {
             background: transparent !important;
         }
 
-        :host-context(body.has-glass) .response-container::-webkit-scrollbar-track,
-        :host-context(body.has-glass) .response-container::-webkit-scrollbar-thumb {
+        :host-context(body.has-rani) .response-container::-webkit-scrollbar-track,
+        :host-context(body.has-rani) .response-container::-webkit-scrollbar-thumb {
             background: transparent !important;
         }
 

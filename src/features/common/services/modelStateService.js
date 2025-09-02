@@ -11,7 +11,7 @@ class ModelStateService extends EventEmitter {
         super();
         this.authService = authService;
         // electron-store는 오직 레거시 데이터 마이그레이션 용도로만 사용됩니다.
-        this.store = new Store({ name: 'pickle-glass-model-state' });
+        this.store = new Store({ name: 'rani-model-state' });
     }
 
     async initialize() {

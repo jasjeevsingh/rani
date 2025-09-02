@@ -9,7 +9,7 @@ const modelStateService = require('../common/services/modelStateService');
 const localAIManager = require('../common/services/localAIManager');
 
 const store = new Store({
-    name: 'pickle-glass-settings',
+    name: 'rani-settings',
     defaults: {
         users: {}
     }

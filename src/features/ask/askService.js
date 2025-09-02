@@ -16,6 +16,7 @@ const getWindowPool = () => {
 const sessionRepository = require('../common/repositories/session');
 const askRepository = require('./repositories');
 const { getSystemPrompt } = require('../common/prompts/promptBuilder');
+const { profilePrompts } = require('../common/prompts/promptTemplates');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
@@ -343,7 +344,7 @@ class AskService {
 
             const conversationHistory = this._formatConversationForPrompt(conversationHistoryRaw);
 
-            const systemPrompt = getSystemPrompt('pickle_glass_analysis', conversationHistory, false);
+            const systemPrompt = getSystemPrompt('rani_analysis', conversationHistory);
 
             const messages = [
                 { role: 'system', content: systemPrompt },
@@ -367,8 +368,8 @@ class AskService {
                 model: modelInfo.model,
                 temperature: 0.7,
                 maxTokens: 2048,
-                usePortkey: modelInfo.provider === 'openai-glass',
-                portkeyVirtualKey: modelInfo.provider === 'openai-glass' ? modelInfo.apiKey : undefined,
+                usePortkey: false, // Disable Portkey for now
+                portkeyVirtualKey: undefined,
             });
 
             try {
@@ -673,8 +674,8 @@ Conversational response:`;
                 model: modelInfo.model,
                 temperature: 0.7,
                 maxTokens: 300, // Shorter for conversational response
-                usePortkey: modelInfo.provider === 'openai-glass',
-                portkeyVirtualKey: modelInfo.provider === 'openai-glass' ? modelInfo.apiKey : undefined,
+                usePortkey: false, // Disable Portkey for now
+                portkeyVirtualKey: undefined,
             });
 
             const response = await streamingLLM.streamChat(messages);

@@ -218,7 +218,7 @@ class SQLiteClient {
             VALUES (?, ?, ?, ?)
         `;
 
-        this.db.prepare(initUserQuery).run(this.defaultUserId, 'Default User', 'contact@pickle.com', now);
+        this.db.prepare(initUserQuery).run(this.defaultUserId, 'Default User', 'contact@rani.ai', now);
 
         const defaultPresets = [
             ['school', 'School', 'You are a school and lecture assistant. Your goal is to help the user, a student, understand academic material and answer questions.\n\nWhenever a question appears on the user\'s screen or is asked aloud, you provide a direct, step-by-step answer, showing all necessary reasoning or calculations.\n\nIf the user is watching a lecture or working through new material, you offer concise explanations of key concepts and clarify definitions as they come up.', 1],

@@ -89,10 +89,10 @@ function initializeFirebase() {
         });
 
         // Initialize Firestore with the specific database ID
-        firestoreInstance = getFirestore(firebaseApp, 'pickle-glass');
+        firestoreInstance = getFirestore(firebaseApp, 'rani');
 
         console.log('[FirebaseClient] Firebase initialized successfully with class-based electron-store persistence.');
-        console.log('[FirebaseClient] Firestore instance is targeting the "pickle-glass" database.');
+        console.log('[FirebaseClient] Firestore instance is targeting the "rani" database.');
     } catch (error) {
         console.error('[FirebaseClient] Firebase initialization failed:', error);
     }
