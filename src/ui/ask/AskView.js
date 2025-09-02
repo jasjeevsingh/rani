@@ -20,6 +20,7 @@ export class AskView extends LitElement {
         sttTranscription: { type: String },
         voiceActivity: { type: Boolean },
         conversationalResponse: { type: String },
+        conversationHistory: { type: Array },
     };
 
     static styles = css`
@@ -805,6 +806,65 @@ export class AskView extends LitElement {
                 background: rgba(239, 68, 68, 0.3);
             }
         }
+
+        /* Conversation History Styles */
+        .conversation-container {
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 16px;
+            background: transparent;
+        }
+
+        .conversation-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .conversation-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .conversation-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .conversation-message {
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .conversation-message.user {
+            color: rgba(255, 255, 255, 0.8);
+            font-style: italic;
+            margin-bottom: 12px;
+            line-height: 1.4;
+            text-align: right;
+        }
+
+        .conversation-message.assistant {
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.5;
+        }
+
+        .conversation-message.current-response {
+            /* Current response gets special styling to indicate it's live */
+            border-left: 2px solid rgba(0, 122, 255, 0.5);
+            padding-left: 12px;
+            margin-left: -14px;
+        }
+
+        .conversation-message-content {
+            font-size: 14px;
+        }
+
+        .conversation-message.user .conversation-message-content {
+            font-size: 14px;
+        }
+
+        .conversation-message.assistant .conversation-message-content {
+            /* Use the same styling as the main response content */
+        }
     `;
 
     constructor() {
@@ -821,6 +881,7 @@ export class AskView extends LitElement {
         this.sttTranscription = '';
         this.voiceActivity = false;
         this.conversationalResponse = '';
+        this.conversationHistory = [];
 
         this.marked = null;
         this.hljs = null;
@@ -857,6 +918,9 @@ export class AskView extends LitElement {
 
         console.log('📱 AskView connectedCallback - IPC 이벤트 리스너 설정');
 
+        // Load conversation history when component mounts
+        this.loadConversationHistory();
+
         document.addEventListener('keydown', this.handleEscKey);
 
         this.resizeObserver = new ResizeObserver(entries => {
@@ -892,6 +956,9 @@ export class AskView extends LitElement {
             window.api.askView.onScrollResponseUp(() => this.handleScroll('up'));
             window.api.askView.onScrollResponseDown(() => this.handleScroll('down'));
             window.api.askView.onAskStateUpdate((event, newState) => {
+                const previousResponse = this.currentResponse;
+                const wasStreaming = this.isStreaming;
+                
                 this.currentResponse = newState.currentResponse;
                 this.currentQuestion = newState.currentQuestion;
                 this.isLoading       = newState.isLoading;
@@ -899,6 +966,19 @@ export class AskView extends LitElement {
                 this.isListening     = newState.isListening || false;
                 this.sttTranscription = newState.sttTranscription || '';
                 this.conversationalResponse = newState.conversationalResponse || '';
+                
+                // When streaming completes, move the response to conversation history
+                if (wasStreaming && !newState.isStreaming && !newState.isLoading && 
+                    newState.currentResponse && newState.currentResponse !== previousResponse) {
+                    this.addToConversationHistory('assistant', newState.currentResponse);
+                    
+                    // Clear current response so it doesn't duplicate in the UI
+                    // The conversation history now contains this response
+                    this.currentResponse = '';
+                    
+                    // Auto-scroll to bottom to show the latest content
+                    this.scrollToBottom();
+                }
               
                 const wasHidden = !this.showTextInput;
                 this.showTextInput = newState.showTextInput;
@@ -923,10 +1003,17 @@ export class AskView extends LitElement {
 
             window.api.askView.onSttComplete((event, data) => {
                 this.sttTranscription = '';
-                this.isListening = false;
+                // Only update UI state from the backend data, don't override voice session state
+                this.isListening = data.isListening; // Use the listening state from the backend
                 this.voiceActivity = false;
-                if (window.askAudioCapture) {
+                
+                // Only stop audio capture if we're actually stopping the voice session
+                // In conversation mode, the backend keeps isListening=true, so don't stop capture
+                if (!data.isListening && window.askAudioCapture) {
+                    console.log('[AskView] Stopping audio capture - voice session ended');
                     window.askAudioCapture.stopCapture();
+                } else if (data.isListening) {
+                    console.log('[AskView] Keeping audio capture active - conversation mode continues');
                 }
                 this.requestUpdate();
             });
@@ -937,10 +1024,13 @@ export class AskView extends LitElement {
 
             window.api.askView.onSttError((event, data) => {
                 console.error('[AskView] STT error:', data.error);
-                this.isListening = false;
+                this.isListening = data.isListening || false; // Use backend state
                 this.sttTranscription = '';
                 this.voiceActivity = false;
-                if (window.askAudioCapture) {
+                
+                // Only stop audio capture if the backend indicates we should stop listening
+                if (!this.isListening && window.askAudioCapture) {
+                    console.log('[AskView] Stopping audio capture due to STT error');
                     window.askAudioCapture.stopCapture();
                 }
                 this.requestUpdate();
@@ -1049,7 +1139,9 @@ export class AskView extends LitElement {
     }
 
     handleCloseAskWindow() {
-        // this.clearResponseContent();
+        // Clear conversation history when closing
+        this.conversationHistory = [];
+        this.clearResponseContent();
         window.api.askView.closeAskWindow();
     }
 
@@ -1075,6 +1167,7 @@ export class AskView extends LitElement {
         this.sttTranscription = '';
         this.voiceActivity = false;
         this.conversationalResponse = '';
+        this.conversationHistory = [];
         this.headerText = 'AI Response';
         this.showTextInput = true;
         this.lastProcessedLength = 0;
@@ -1151,29 +1244,24 @@ export class AskView extends LitElement {
 
 
     renderContent() {
-        const responseContainer = this.shadowRoot.getElementById('responseContainer');
+        const responseContainer = this.shadowRoot.getElementById('currentResponseContent');
         if (!responseContainer) return;
     
         // Check loading state
         if (this.isLoading) {
-            responseContainer.innerHTML = `
-              <div class="loading-dots">
-                <div class="loading-dot"></div>
-                <div class="loading-dot"></div>
-                <div class="loading-dot"></div>
-              </div>`;
+            // Loading animation is handled in the template
             this.resetStreamingParser();
             return;
         }
         
-        // If there is no response, show empty state
+        // If there is no response, clear content
         if (!this.currentResponse) {
-            responseContainer.innerHTML = `<div class="empty-state">...</div>`;
+            responseContainer.innerHTML = '';
             this.resetStreamingParser();
             return;
         }
         
-        // Set streaming markdown parser
+        // Set streaming markdown parser for current response
         this.renderStreamingMarkdown(responseContainer);
 
         // After updating content, recalculate window height
@@ -1224,8 +1312,11 @@ export class AskView extends LitElement {
                 });
             }
 
-            // 스크롤을 맨 아래로
-            responseContainer.scrollTop = responseContainer.scrollHeight;
+            // 스크롤을 맨 아래로 (conversation container)
+            const conversationContainer = this.shadowRoot.querySelector('.conversation-container');
+            if (conversationContainer) {
+                conversationContainer.scrollTop = conversationContainer.scrollHeight;
+            }
             
         } catch (error) {
             console.error('Error rendering streaming markdown:', error);
@@ -1436,6 +1527,17 @@ export class AskView extends LitElement {
 
         textInput.value = '';
 
+        // If there's a current response, move it to conversation history before new question
+        if (this.currentResponse && this.currentResponse.trim()) {
+            this.addToConversationHistory('assistant', this.currentResponse);
+            this.currentResponse = ''; // Clear current response
+        }
+
+        // Add user message to conversation history
+        if (text) {
+            this.addToConversationHistory('user', text);
+        }
+
         if (window.api) {
             window.api.askView.sendMessage(text).catch(error => {
                 console.error('Error sending text:', error);
@@ -1470,6 +1572,125 @@ export class AskView extends LitElement {
         } catch (error) {
             console.error('[AskView] Error handling mic click:', error);
         }
+    }
+
+    /**
+     * Load conversation history from database
+     */
+    async loadConversationHistory() {
+        try {
+            if (window.api) {
+                const result = await window.api.askView.loadConversationHistory();
+                if (result.success) {
+                    this.conversationHistory = result.conversationHistory || [];
+                    console.log(`[AskView] Loaded ${this.conversationHistory.length} conversation messages`);
+                    this.requestUpdate();
+                } else {
+                    console.error('[AskView] Failed to load conversation history:', result.error);
+                }
+            }
+        } catch (error) {
+            console.error('[AskView] Error loading conversation history:', error);
+        }
+    }
+
+    /**
+     * Add a new message to conversation history
+     */
+    addToConversationHistory(role, content, timestamp = Date.now()) {
+        this.conversationHistory.push({
+            id: `temp-${Date.now()}`,
+            role,
+            content,
+            timestamp
+        });
+        this.requestUpdate();
+        
+        // Auto-scroll to bottom when new content is added
+        this.scrollToBottom();
+    }
+
+    /**
+     * Render markdown content for conversation history
+     */
+    renderMarkdownContent(content) {
+        if (!content) return '';
+        
+        try {
+            // Create a temporary container for rendering
+            const tempContainer = document.createElement('div');
+            
+            // Use the same renderer as the streaming markdown
+            const renderer = default_renderer(tempContainer);
+            const mdParser = parser(renderer);
+            
+            // Render the complete markdown content
+            parser_write(mdParser, content);
+            parser_end(mdParser);
+            
+            // Apply code highlighting if available
+            if (this.hljs) {
+                tempContainer.querySelectorAll('pre code').forEach(block => {
+                    try {
+                        this.hljs.highlightElement(block);
+                    } catch (e) {
+                        console.warn('Code highlighting failed for block:', e);
+                    }
+                });
+            }
+            
+            // Return the rendered HTML as a lit-html template
+            return html`${tempContainer.innerHTML}`;
+        } catch (error) {
+            console.error('Error rendering markdown content:', error);
+            return content; // Fallback to plain text
+        }
+    }
+
+    /**
+     * Render markdown content directly into a DOM element
+     */
+    renderMarkdownIntoElement(element, content) {
+        if (!content || !element) return;
+        
+        try {
+            // Clear the element first
+            element.innerHTML = '';
+            
+            // Use the same renderer as the streaming markdown
+            const renderer = default_renderer(element);
+            const mdParser = parser(renderer);
+            
+            // Render the complete markdown content
+            parser_write(mdParser, content);
+            parser_end(mdParser);
+            
+            // Apply code highlighting if available
+            if (this.hljs) {
+                element.querySelectorAll('pre code').forEach(block => {
+                    try {
+                        this.hljs.highlightElement(block);
+                    } catch (e) {
+                        console.warn('Code highlighting failed for block:', e);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error rendering markdown into element:', error);
+            element.textContent = content; // Fallback to plain text
+        }
+    }
+
+    /**
+     * Scroll conversation container to bottom
+     */
+    scrollToBottom() {
+        this.updateComplete.then(() => {
+            const conversationContainer = this.shadowRoot.querySelector('.conversation-container');
+            if (conversationContainer) {
+                conversationContainer.scrollTop = conversationContainer.scrollHeight;
+            }
+        });
     }
 
     /**
@@ -1614,6 +1835,17 @@ export class AskView extends LitElement {
         if (changedProperties.has('showTextInput') && this.showTextInput) {
             this.focusTextInput();
         }
+
+        // Render markdown content for assistant messages in conversation history
+        this.conversationHistory.forEach((message, index) => {
+            if (message.role === 'assistant') {
+                const element = this.shadowRoot.querySelector(`#history-message-${index}`);
+                if (element && !element.dataset.rendered) {
+                    this.renderMarkdownIntoElement(element, message.content);
+                    element.dataset.rendered = 'true';
+                }
+            }
+        });
     }
 
     firstUpdated() {
@@ -1632,11 +1864,12 @@ export class AskView extends LitElement {
     render() {
         const hasResponse = this.isLoading || this.currentResponse || this.isStreaming;
         const headerText = this.isLoading ? 'Thinking...' : 'AI Response';
+        const hasConversation = this.conversationHistory.length > 0 || hasResponse;
 
         return html`
             <div class="ask-container">
                 <!-- Response Header -->
-                <div class="response-header ${!hasResponse ? 'hidden' : ''}">
+                <div class="response-header ${!hasConversation ? 'hidden' : ''}">
                     <div class="header-left">
                         <div class="response-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1676,13 +1909,36 @@ export class AskView extends LitElement {
                     </div>
                 </div>
 
-                <!-- Response Container -->
-                <div class="response-container ${!hasResponse ? 'hidden' : ''}" id="responseContainer">
-                    <!-- Content is dynamically generated in updateResponseContent() -->
+                <!-- Unified Conversation Container -->
+                <div class="conversation-container ${!hasConversation ? 'hidden' : ''}" id="conversationContainer">
+                    <!-- Conversation History -->
+                    ${this.conversationHistory.map((message, index) => html`
+                        <div class="conversation-message ${message.role}">
+                            <div class="conversation-message-content" id="history-message-${index}" data-message-index="${index}" data-role="${message.role}">
+                                ${message.role === 'assistant' ? '' : message.content}
+                            </div>
+                        </div>
+                    `)}
+                    
+                    <!-- Current Response (if active) -->
+                    ${hasResponse ? html`
+                        <div class="conversation-message assistant current-response">
+                            <div class="conversation-message-content" id="currentResponseContent">
+                                ${this.isLoading ? html`
+                                    <div class="loading-dots">
+                                        <div class="loading-dot"></div>
+                                        <div class="loading-dot"></div>
+                                        <div class="loading-dot"></div>
+                                    </div>
+                                ` : ''}
+                                <!-- Content is dynamically generated in updateResponseContent() -->
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
 
                 <!-- Text Input Container -->
-                <div class="text-input-container ${!hasResponse ? 'no-response' : ''} ${!this.showTextInput ? 'hidden' : ''}">
+                <div class="text-input-container ${!hasConversation ? 'no-response' : ''} ${!this.showTextInput ? 'hidden' : ''}">
                     <div style="display: flex; align-items: center; width: 100%;">
                         <!-- Microphone Button -->
                         <button
@@ -1738,16 +1994,16 @@ export class AskView extends LitElement {
 
         this.updateComplete.then(() => {
             const headerEl = this.shadowRoot.querySelector('.response-header');
-            const responseEl = this.shadowRoot.querySelector('.response-container');
+            const conversationEl = this.shadowRoot.querySelector('.conversation-container');
             const inputEl = this.shadowRoot.querySelector('.text-input-container');
 
-            if (!headerEl || !responseEl) return;
+            if (!headerEl || !conversationEl) return;
 
             const headerHeight = headerEl.classList.contains('hidden') ? 0 : headerEl.offsetHeight;
-            const responseHeight = responseEl.scrollHeight;
+            const conversationHeight = conversationEl.scrollHeight;
             const inputHeight = (inputEl && !inputEl.classList.contains('hidden')) ? inputEl.offsetHeight : 0;
 
-            const idealHeight = headerHeight + responseHeight + inputHeight;
+            const idealHeight = headerHeight + conversationHeight + inputHeight;
 
             const targetHeight = Math.min(700, idealHeight);
 

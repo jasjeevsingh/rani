@@ -170,7 +170,10 @@ class AskService {
             onTranscriptionComplete: (text) => {
                 console.log('[AskService] STT transcription complete:', text);
                 this.state.sttTranscription = text;
-                this.state.isListening = false;
+                
+                // Don't automatically stop listening in conversation mode
+                // Keep listening for continuous conversation until user manually stops
+                console.log('[AskService] Keeping voice input active for conversation mode');
                 this._broadcastState();
                 
                 // Auto-submit the transcribed text
@@ -178,12 +181,12 @@ class AskService {
                     this.sendMessage(text.trim());
                 }
                 
-                // Send completion to the ask window
+                // Send completion to the ask window but keep listening active
                 const askWindow = getWindowPool()?.get('ask');
                 if (askWindow && !askWindow.isDestroyed()) {
                     askWindow.webContents.send('ask:sttComplete', { 
                         text,
-                        isListening: false 
+                        isListening: this.state.isListening  // Keep current listening state
                     });
                 }
             },
@@ -298,13 +301,18 @@ class AskService {
      */
     async sendMessage(userPrompt, conversationHistoryRaw=[]) {
         internalBridge.emit('window:requestVisibility', { name: 'ask', visible: true });
+        
+        // Check if we're in voice mode for UI input visibility
+        const isVoiceModeForUI = this.state.isListening || this.state.sttTranscription;
+        
         this.state = {
             ...this.state,
             isLoading: true,
             isStreaming: false,
             currentQuestion: userPrompt,
             currentResponse: '',
-            showTextInput: false,
+            // Keep text input visible in voice conversation mode to show voice UI controls
+            showTextInput: isVoiceModeForUI ? true : false,
         };
         this._broadcastState();
 
@@ -729,6 +737,32 @@ Conversational response:`;
             return await this.stopVoiceInput();
         } else {
             return await this.startVoiceInput();
+        }
+    }
+
+    /**
+     * Load conversation history for current session
+     */
+    async loadConversationHistory() {
+        try {
+            const sessionId = await sessionRepository.getOrCreateActive('ask');
+            const messages = await askRepository.getAllAiMessagesBySessionId(sessionId);
+            
+            console.log(`[AskService] Loaded ${messages.length} messages from session ${sessionId}`);
+            
+            // Convert database messages to display format
+            const conversationHistory = messages.map(msg => ({
+                id: msg.id,
+                role: msg.role,
+                content: msg.content,
+                timestamp: msg.sent_at || msg.created_at,
+                model: msg.model
+            }));
+            
+            return { success: true, conversationHistory, sessionId };
+        } catch (error) {
+            console.error('[AskService] Error loading conversation history:', error);
+            return { success: false, error: error.message };
         }
     }
 

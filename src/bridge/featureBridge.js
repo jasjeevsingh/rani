@@ -88,6 +88,7 @@ module.exports = {
     ipcMain.handle('ask:stopVoiceInput', async () => await askService.stopVoiceInput());
     ipcMain.handle('ask:toggleVoiceInput', async () => await askService.toggleVoiceInput());
     ipcMain.handle('ask:sendAudioData', async (event, { data, mimeType }) => await askService.sendAudioData(data, mimeType));
+    ipcMain.handle('ask:loadConversationHistory', async () => await askService.loadConversationHistory());
     
     // Research
     ipcMain.handle('research:toggleResearchView', async () => {
