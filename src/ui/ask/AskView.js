@@ -504,6 +504,16 @@ export class AskView extends LitElement {
             transform-origin: bottom;
         }
 
+        /* Sticky input box when focus lock is active */
+        :host(.focus-lock) .text-input-container {
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            background: rgba(0, 0, 0, 0.8);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
         .text-input-container.hidden {
             opacity: 0;
             transform: scaleY(0);
@@ -865,6 +875,20 @@ export class AskView extends LitElement {
         .conversation-message.assistant .conversation-message-content {
             /* Use the same styling as the main response content */
         }
+
+        /* Focus Lock: Hide all messages except those marked as focus-visible */
+        :host(.focus-lock) .conversation-container .conversation-message {
+            display: none !important;
+        }
+
+        :host(.focus-lock) .conversation-container .conversation-message.focus-visible {
+            display: block !important;
+        }
+
+        /* Current response is always visible during streaming */
+        :host(.focus-lock) .conversation-container .conversation-message.current-response {
+            display: block !important;
+        }
     `;
 
     constructor() {
@@ -882,6 +906,12 @@ export class AskView extends LitElement {
         this.voiceActivity = false;
         this.conversationalResponse = '';
         this.conversationHistory = [];
+        this.conversationHistoryLoaded = false; // Flag to prevent duplicate loading
+
+        // Focus lock for latest exchange mode
+        this.focusLock = false; // when true, only latest exchange is visible
+        this.lastUserMessage = null; // reference to last user message element
+        this.lastAssistantMessage = null; // reference to last assistant message element
 
         this.marked = null;
         this.hljs = null;
@@ -916,6 +946,7 @@ export class AskView extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
+        console.log(`🔍 [Debug] connectedCallback - loaded flag: ${this.conversationHistoryLoaded}, history length: ${this.conversationHistory.length}`);
         console.log('📱 AskView connectedCallback - IPC 이벤트 리스너 설정');
 
         // Load conversation history when component mounts
@@ -944,11 +975,14 @@ export class AskView extends LitElement {
 
         if (window.api) {
             window.api.askView.onShowTextInput(() => {
-                console.log('Show text input signal received');
+                console.log('📎 [Ask Button] Show text input signal received');
+                console.log('📎 [Ask Button] Current state - showTextInput:', this.showTextInput, 'conversationHistory.length:', this.conversationHistory.length);
                 if (!this.showTextInput) {
+                    console.log('📎 [Ask Button] Setting showTextInput to true and focusing input');
                     this.showTextInput = true;
                     this.updateComplete.then(() => this.focusTextInput());
                   } else {
+                    console.log('📎 [Ask Button] Text input already visible, just focusing');
                     this.focusTextInput();
                   }
             });
@@ -958,37 +992,128 @@ export class AskView extends LitElement {
             window.api.askView.onAskStateUpdate((event, newState) => {
                 const previousResponse = this.currentResponse;
                 const wasStreaming = this.isStreaming;
+                const wasLoading = this.isLoading;
+                const wasListening = this.isListening;
+                const hadTextInput = this.showTextInput;
                 
-                this.currentResponse = newState.currentResponse;
-                this.currentQuestion = newState.currentQuestion;
-                this.isLoading       = newState.isLoading;
-                this.isStreaming     = newState.isStreaming;
-                this.isListening     = newState.isListening || false;
+                // Track what actually changed to avoid unnecessary re-renders
+                const stateChanged = {
+                    loading: this.isLoading !== newState.isLoading,
+                    streaming: this.isStreaming !== newState.isStreaming,
+                    listening: this.isListening !== (newState.isListening || false),
+                    textInput: this.showTextInput !== newState.showTextInput,
+                    question: this.currentQuestion !== newState.currentQuestion,
+                    response: this.currentResponse !== newState.currentResponse
+                };
+                
+                // Only update properties that actually changed
+                if (stateChanged.response) this.currentResponse = newState.currentResponse;
+                if (stateChanged.question) this.currentQuestion = newState.currentQuestion;
+                if (stateChanged.loading) this.isLoading = newState.isLoading;
+                if (stateChanged.streaming) this.isStreaming = newState.isStreaming;
+                if (stateChanged.listening) this.isListening = newState.isListening || false;
+                if (stateChanged.textInput) this.showTextInput = newState.showTextInput;
+                
+                // Always update these non-reactive properties
                 this.sttTranscription = newState.sttTranscription || '';
                 this.conversationalResponse = newState.conversationalResponse || '';
                 
+                // Debug streaming state changes
+                if (this.focusLock && (stateChanged.streaming || stateChanged.loading)) {
+                    console.log('🔍 [Debug] Streaming state check:', {
+                        wasStreaming,
+                        'newState.isStreaming': newState.isStreaming,
+                        'newState.isLoading': newState.isLoading,
+                        'newState.currentResponse': !!newState.currentResponse,
+                        'original condition met': wasStreaming && !newState.isStreaming && !newState.isLoading && 
+                            newState.currentResponse && newState.currentResponse !== previousResponse,
+                        'simplified condition met': wasStreaming && !newState.isStreaming && !newState.isLoading && 
+                            newState.currentResponse
+                    });
+                }
+
                 // When streaming completes, move the response to conversation history
-                if (wasStreaming && !newState.isStreaming && !newState.isLoading && 
-                    newState.currentResponse && newState.currentResponse !== previousResponse) {
-                    this.addToConversationHistory('assistant', newState.currentResponse);
+                // Simplified condition: just check if streaming stopped and we have a response
+                if (wasStreaming && !newState.isStreaming && !newState.isLoading && newState.currentResponse) {
+                    console.log('🏁 [Stream Complete] Moving assistant response to conversation history');
+                    
+                    // Only add to history if it's not already there (avoid duplicates)
+                    const lastMessage = this.conversationHistory[this.conversationHistory.length - 1];
+                    const isDuplicate = lastMessage && lastMessage.role === 'assistant' && 
+                                      lastMessage.content.trim() === newState.currentResponse.trim();
+                    
+                    if (!isDuplicate) {
+                        this.addToConversationHistory('assistant', newState.currentResponse);
+                        console.log('📝 [Stream Complete] Added unique assistant response to history');
+                    } else {
+                        console.log('⚠️ [Stream Complete] Skipped duplicate assistant response');
+                    }
                     
                     // Clear current response so it doesn't duplicate in the UI
                     // The conversation history now contains this response
                     this.currentResponse = '';
+                    console.log('🧹 [Stream Complete] Cleared current response');
                     
-                    // Auto-scroll to bottom to show the latest content
-                    this.scrollToBottom();
+                    // Reset streaming parser state
+                    this.resetStreamingParser();
+                    
+                    // Deactivate focus lock when streaming completes
+                    if (this.focusLock) {
+                        console.log('🔓 [Focus Lock] Beginning deactivation process...');
+                        
+                        this.focusLock = false;
+                        this.classList.remove('focus-lock');
+                        
+                        // Remove per-message "focus-visible" classes safely
+                        if (this.lastUserMessage && this.lastUserMessage.classList) {
+                            this.lastUserMessage.classList.remove('focus-visible');
+                            console.log('🧹 [Focus Lock] Removed focus-visible from last user message');
+                            this.lastUserMessage = null;
+                        }
+                        if (this.lastAssistantMessage && this.lastAssistantMessage.classList) {
+                            this.lastAssistantMessage.classList.remove('focus-visible');
+                            console.log('🧹 [Focus Lock] Removed focus-visible from last assistant message');
+                            this.lastAssistantMessage = null;
+                        }
+                        
+                        // Extra cleanup: remove any remaining focus-visible classes
+                        const conversationContainer = this.shadowRoot?.querySelector('.conversation-container');
+                        if (conversationContainer) {
+                            const remainingVisible = conversationContainer.querySelectorAll('.conversation-message.focus-visible');
+                            remainingVisible.forEach(msg => {
+                                msg.classList.remove('focus-visible');
+                                console.log('🧹 [Focus Lock] Cleaned up remaining focus-visible class');
+                            });
+                        }
+                        
+                        console.log('✅ [Focus Lock] Deactivated - all messages now visible, user can scroll freely');
+                        
+                        // Force a re-render to ensure CSS changes take effect
+                        this.requestUpdate();
+                        
+                        // After DOM updates, scroll to bottom to show the latest exchange
+                        this.updateComplete.then(() => {
+                            // Small delay to ensure all CSS transitions are complete
+                            setTimeout(() => {
+                                this.scrollToBottom();
+                                console.log('📍 [Focus Lock] Scrolled to show latest exchange');
+                            }, 100);
+                        });
+                        
+                        // Don't auto-scroll after unlock - let user scroll freely
+                    } else {
+                        // Auto-scroll to bottom to show the latest content
+                        this.scrollToBottom();
+                    }
                 }
               
-                const wasHidden = !this.showTextInput;
-                this.showTextInput = newState.showTextInput;
-              
-                if (newState.showTextInput) {
-                  if (wasHidden) {
-                    this.updateComplete.then(() => this.focusTextInput());
-                  } else {
-                    this.focusTextInput();
-                  }
+                // Handle text input focus when showTextInput changes
+                if (stateChanged.textInput && newState.showTextInput) {
+                    if (!hadTextInput) {
+                        this.updateComplete.then(() => this.focusTextInput());
+                    } else {
+                        this.focusTextInput();
+                    }
                 }
               });
 
@@ -1079,6 +1204,12 @@ export class AskView extends LitElement {
             window.api.askView.removeOnConversationalResponse();
             console.log('✅ AskView: IPC 이벤트 리스너 제거 필요');
         }
+
+        // Clean up focus lock state and CSS class
+        this.focusLock = false;
+        this.lastUserMessage = null;
+        this.lastAssistantMessage = null;
+        this.classList.remove('focus-lock');
     }
 
 
@@ -1125,7 +1256,10 @@ export class AskView extends LitElement {
                 });
 
                 this.isLibrariesLoaded = true;
-                this.renderContent();
+                // Defer renderContent() until after any current render cycle completes
+                this.updateComplete.then(() => {
+                    this.renderContent();
+                });
                 console.log('Markdown libraries loaded successfully in AskView');
             }
 
@@ -1244,28 +1378,47 @@ export class AskView extends LitElement {
 
 
     renderContent() {
-        const responseContainer = this.shadowRoot.getElementById('currentResponseContent');
-        if (!responseContainer) return;
-    
-        // Check loading state
-        if (this.isLoading) {
-            // Loading animation is handled in the template
-            this.resetStreamingParser();
-            return;
-        }
-        
-        // If there is no response, clear content
-        if (!this.currentResponse) {
-            responseContainer.innerHTML = '';
-            this.resetStreamingParser();
-            return;
-        }
-        
-        // Set streaming markdown parser for current response
-        this.renderStreamingMarkdown(responseContainer);
+        // Defer ALL DOM access until after render cycle completes to prevent LitElement crashes
+        this.updateComplete.then(() => {
+            const responseContainer = this.shadowRoot?.getElementById('currentResponseContent');
+            if (!responseContainer || !responseContainer.isConnected) {
+                console.warn('[renderContent] Response container not found or not connected to DOM');
+                return;
+            }
 
-        // After updating content, recalculate window height
-        this.adjustWindowHeightThrottled();
+            // Store reference to assistant message container for focus lock
+            if (this.focusLock && !this.lastAssistantMessage) {
+                const container = this.shadowRoot?.getElementById('currentResponseContent');
+                if (container && container.isConnected) {
+                    this.lastAssistantMessage = container.closest('.conversation-message');
+                    if (this.lastAssistantMessage) {
+                        console.log('📍 [Focus Lock] Assistant message container found and stored');
+                    }
+                }
+            }
+        
+            // Check loading state
+            if (this.isLoading) {
+                // Loading animation is handled in the template
+                this.resetStreamingParser();
+                return;
+            }
+        
+            // If there is no response, clear content
+            if (!this.currentResponse) {
+                responseContainer.innerHTML = '';
+                this.resetStreamingParser();
+                return;
+            }
+            
+            // Set streaming markdown parser for current response
+            this.renderStreamingMarkdown(responseContainer);
+
+            // After updating content, recalculate window height
+            this.adjustWindowHeightThrottled();
+        }).catch(error => {
+            console.error('[renderContent] Error in DOM manipulation:', error);
+        });
     }
 
     resetStreamingParser() {
@@ -1276,6 +1429,12 @@ export class AskView extends LitElement {
 
     renderStreamingMarkdown(responseContainer) {
         try {
+            // Check if container exists and is connected to DOM
+            if (!responseContainer || !responseContainer.isConnected) {
+                console.error('Container not found or not connected for renderStreamingMarkdown operation.');
+                return;
+            }
+
             // 파서가 없거나 컨테이너가 변경되었으면 새로 생성
             if (!this.smdParser || this.smdContainer !== responseContainer) {
                 this.smdContainer = responseContainer;
@@ -1302,19 +1461,23 @@ export class AskView extends LitElement {
                 parser_end(this.smdParser);
             }
 
-            // 코드 하이라이팅 적용
-            if (this.hljs) {
+            // 코드 하이라이팅 적용 (안전한 DOM 접근)
+            if (this.hljs && responseContainer.isConnected) {
                 responseContainer.querySelectorAll('pre code').forEach(block => {
                     if (!block.hasAttribute('data-highlighted')) {
-                        this.hljs.highlightElement(block);
-                        block.setAttribute('data-highlighted', 'true');
+                        try {
+                            this.hljs.highlightElement(block);
+                            block.setAttribute('data-highlighted', 'true');
+                        } catch (e) {
+                            console.warn('Code highlighting failed for block:', e);
+                        }
                     }
                 });
             }
 
-            // 스크롤을 맨 아래로 (conversation container)
-            const conversationContainer = this.shadowRoot.querySelector('.conversation-container');
-            if (conversationContainer) {
+            // 스크롤을 맨 아래로 (conversation container) - 안전한 DOM 접근
+            const conversationContainer = this.shadowRoot?.querySelector('.conversation-container');
+            if (conversationContainer && conversationContainer.isConnected) {
                 conversationContainer.scrollTop = conversationContainer.scrollHeight;
             }
             
@@ -1356,7 +1519,7 @@ export class AskView extends LitElement {
                 responseContainer.textContent = textToRender;
             }
         } else {
-            // 라이브러리가 로드되지 않았을 때 기본 렌더링
+            // 라이브러리가 로드되지 않았을 때 기본 렌딩
             const basicHtml = textToRender
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
@@ -1520,6 +1683,20 @@ export class AskView extends LitElement {
         }
     }
 
+    addToConversationHistory(role, content, timestamp = Date.now()) {
+        if (this.conversationHistory.some(msg => msg.role === role && msg.content.trim() === content.trim())) {
+            console.warn(`[History] Duplicate message detected, skipping: "${content}"`);
+            return; // Avoid adding duplicate messages
+        }
+        this.conversationHistory.push({
+            id: `temp-${Date.now()}`,
+            role,
+            content,
+            timestamp
+        });
+        this.requestUpdate();
+    }
+
     async handleSendText(e, overridingText = '') {
         const textInput = this.shadowRoot?.getElementById('textInput');
         const text = (overridingText || textInput?.value || '').trim();
@@ -1527,15 +1704,43 @@ export class AskView extends LitElement {
 
         textInput.value = '';
 
-        // If there's a current response, move it to conversation history before new question
-        if (this.currentResponse && this.currentResponse.trim()) {
-            this.addToConversationHistory('assistant', this.currentResponse);
-            this.currentResponse = ''; // Clear current response
-        }
-
         // Add user message to conversation history
         if (text) {
             this.addToConversationHistory('user', text);
+            
+            // Activate focus lock - hide all messages except the latest exchange
+            this.focusLock = true;
+            this.classList.add('focus-lock');
+            console.log('🔄 [Focus Lock] Activated - hiding all previous exchanges');
+            
+            // Wait for DOM update to ensure the new user message is rendered
+            await this.updateComplete;
+            
+            // Clear any existing focus-visible classes from previous messages
+            const conversationContainer = this.shadowRoot?.querySelector('.conversation-container');
+            if (conversationContainer) {
+                // Remove focus-visible from all previous messages
+                const previousVisibleMessages = conversationContainer.querySelectorAll('.conversation-message.focus-visible');
+                previousVisibleMessages.forEach(msg => {
+                    msg.classList.remove('focus-visible');
+                    console.log('🧹 [Focus Lock] Cleared focus-visible from previous message');
+                });
+                
+                // Find and mark only the latest user message as visible
+                // Use defensive DOM access to prevent crashes during rendering
+                this.updateComplete.then(() => {
+                    const conversationContainer = this.shadowRoot?.querySelector('.conversation-container');
+                    if (conversationContainer) {
+                        const userMessages = conversationContainer.querySelectorAll('.conversation-message.user');
+                        this.lastUserMessage = userMessages[userMessages.length - 1];
+                        
+                        if (this.lastUserMessage && this.lastUserMessage.classList) {
+                            this.lastUserMessage.classList.add('focus-visible');
+                            console.log('📍 [Focus Lock] Latest user message marked as visible');
+                        }
+                    }
+                });
+            }
         }
 
         if (window.api) {
@@ -1579,11 +1784,22 @@ export class AskView extends LitElement {
      */
     async loadConversationHistory() {
         try {
+            console.log(`🔍 [Debug] loadConversationHistory called - loaded flag: ${this.conversationHistoryLoaded}, local history length: ${this.conversationHistory.length}`);
+            
+            // If we've already loaded conversation history in this session, don't reload
+            // This prevents duplication when the component is reconnected
+            if (this.conversationHistoryLoaded) {
+                console.log(`[AskView] Conversation history already loaded in this session - skipping database load`);
+                return;
+            }
+
             if (window.api) {
+                console.log(`🔍 [Debug] Loading conversation history from database...`);
                 const result = await window.api.askView.loadConversationHistory();
                 if (result.success) {
                     this.conversationHistory = result.conversationHistory || [];
-                    console.log(`[AskView] Loaded ${this.conversationHistory.length} conversation messages`);
+                    this.conversationHistoryLoaded = true; // Mark as loaded
+                    console.log(`[AskView] Loaded ${this.conversationHistory.length} conversation messages from database`);
                     this.requestUpdate();
                 } else {
                     console.error('[AskView] Failed to load conversation history:', result.error);
@@ -1598,16 +1814,26 @@ export class AskView extends LitElement {
      * Add a new message to conversation history
      */
     addToConversationHistory(role, content, timestamp = Date.now()) {
+        console.log(`📝 [History] Adding ${role} message to conversation history (current length: ${this.conversationHistory.length}, focus lock: ${this.focusLock})`);
+        console.log(`📝 [History] Content preview: "${content.substring(0, 50)}..."`);
+        
+        if (this.conversationHistory.some(msg => msg.role === role && msg.content.trim() === content.trim())) {
+            console.warn(`[History] Duplicate message detected, skipping: "${content}"`);
+            return; // Avoid adding duplicate messages
+        }
         this.conversationHistory.push({
             id: `temp-${Date.now()}`,
             role,
             content,
             timestamp
         });
+        console.log(`📝 [History] New conversation history length: ${this.conversationHistory.length}`);
         this.requestUpdate();
         
-        // Auto-scroll to bottom when new content is added
-        this.scrollToBottom();
+        // Only auto-scroll if focus lock is not active
+        if (!this.focusLock) {
+            this.scrollToBottom();
+        }
     }
 
     /**
@@ -1823,9 +2049,11 @@ export class AskView extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
     
-        // ✨ isLoading 또는 currentResponse가 변경될 때마다 뷰를 다시 그립니다.
+        // ✨ Defer renderContent() until after render cycle completes to prevent DOM manipulation conflicts
         if (changedProperties.has('isLoading') || changedProperties.has('currentResponse')) {
-            this.renderContent();
+            this.updateComplete.then(() => {
+                this.renderContent();
+            });
         }
     
         if (changedProperties.has('showTextInput') || changedProperties.has('isLoading') || changedProperties.has('currentResponse')) {
@@ -1865,6 +2093,12 @@ export class AskView extends LitElement {
         const hasResponse = this.isLoading || this.currentResponse || this.isStreaming;
         const headerText = this.isLoading ? 'Thinking...' : 'AI Response';
         const hasConversation = this.conversationHistory.length > 0 || hasResponse;
+
+        // Only show current response if it's not already in conversation history
+        const shouldShowCurrentResponse = hasResponse && (
+            !this.currentResponse || 
+            !this.conversationHistory.some(msg => msg.role === 'assistant' && msg.content.trim() === this.currentResponse.trim())
+        );
 
         return html`
             <div class="ask-container">
@@ -1912,16 +2146,18 @@ export class AskView extends LitElement {
                 <!-- Unified Conversation Container -->
                 <div class="conversation-container ${!hasConversation ? 'hidden' : ''}" id="conversationContainer">
                     <!-- Conversation History -->
-                    ${this.conversationHistory.map((message, index) => html`
-                        <div class="conversation-message ${message.role}">
-                            <div class="conversation-message-content" id="history-message-${index}" data-message-index="${index}" data-role="${message.role}">
-                                ${message.role === 'assistant' ? '' : message.content}
+                    ${(() => {
+                        return this.conversationHistory.map((message, index) => html`
+                            <div class="conversation-message ${message.role}">
+                                <div class="conversation-message-content" id="history-message-${index}" data-message-index="${index}" data-role="${message.role}">
+                                    ${message.role === 'assistant' ? '' : message.content}
+                                </div>
                             </div>
-                        </div>
-                    `)}
+                        `);
+                    })()}
                     
-                    <!-- Current Response (if active) -->
-                    ${hasResponse ? html`
+                    <!-- Current Response (if active and not duplicated) -->
+                    ${shouldShowCurrentResponse ? html`
                         <div class="conversation-message assistant current-response">
                             <div class="conversation-message-content" id="currentResponseContent">
                                 ${this.isLoading ? html`

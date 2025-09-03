@@ -153,7 +153,6 @@ contextBridge.exposeInMainWorld('api', {
     
     // Message Handling
     sendMessage: (text) => ipcRenderer.invoke('ask:sendQuestionFromAsk', text),
-    loadConversationHistory: () => ipcRenderer.invoke('ask:loadConversationHistory'),
 
     // Voice Input
     startVoiceInput: () => ipcRenderer.invoke('ask:startVoiceInput'),
