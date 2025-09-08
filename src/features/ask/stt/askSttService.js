@@ -248,6 +248,156 @@ class AskSttService {
         await this.sttSession.sendRealtimeInput(payload);
     }
 
+    async transcribeCompleteAudio(base64AudioData, mimeType = 'audio/pcm;rate=16000') {
+        console.log(`[AskSttService] transcribeCompleteAudio - data size: ${base64AudioData.length}`);
+        
+        let modelInfo = this.modelInfo;
+        if (!modelInfo) {
+            console.warn('[AskSttService] modelInfo not found, fetching on-the-fly as a fallback...');
+            modelInfo = await modelStateService.getCurrentModelInfo('stt');
+        }
+        if (!modelInfo) {
+            throw new Error('STT model info could not be retrieved.');
+        }
+
+        if (modelInfo.provider === 'openai') {
+            return await this.transcribeWithOpenAIWhisper(base64AudioData, modelInfo);
+        } else {
+            throw new Error(`Direct transcription not implemented for provider: ${modelInfo.provider}`);
+        }
+    }
+
+    async transcribeWithOpenAIWhisper(base64AudioData, modelInfo) {
+        console.log(`[AskSttService] Using OpenAI gpt-4o-mini-transcribe for direct transcription`);
+        
+        return new Promise((resolve, reject) => {
+            const WebSocket = require('ws');
+            const wsUrl = 'wss://api.openai.com/v1/realtime?intent=transcription';
+            
+            const headers = {
+                'Authorization': `Bearer ${modelInfo.apiKey}`,
+                'OpenAI-Beta': 'realtime=v1',
+            };
+            
+            const ws = new WebSocket(wsUrl, { headers });
+            let transcriptionResult = '';
+            let timeoutId;
+            
+            const cleanup = () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.close();
+                }
+            };
+            
+            // Set timeout for transcription
+            timeoutId = setTimeout(() => {
+                cleanup();
+                reject(new Error('Direct transcription timeout'));
+            }, 10000);
+            
+            ws.onopen = () => {
+                console.log("[AskSttService] Direct transcription WebSocket opened");
+                
+                // Configure session for transcription
+                const sessionConfig = {
+                    type: 'transcription_session.update',
+                    session: {
+                        input_audio_format: 'pcm16',
+                        input_audio_transcription: {
+                            model: 'gpt-4o-mini-transcribe',
+                            language: 'en'
+                        }
+                    }
+                };
+                
+                ws.send(JSON.stringify(sessionConfig));
+                
+                // Send the audio data
+                const audioMessage = {
+                    type: 'input_audio_buffer.append',
+                    audio: base64AudioData
+                };
+                ws.send(JSON.stringify(audioMessage));
+                
+                // Commit the audio buffer to trigger transcription
+                const commitMessage = {
+                    type: 'input_audio_buffer.commit'
+                };
+                ws.send(JSON.stringify(commitMessage));
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    console.log(`[AskSttService] Direct transcription message type: ${message.type}`);
+                    console.log(`[AskSttService] Full message:`, JSON.stringify(message, null, 2));
+                    
+                    if (message.type === 'input_audio_buffer.speech_started') {
+                        console.log('[AskSttService] Speech detected in audio buffer');
+                    } else if (message.type === 'conversation.item.input_audio_transcription.completed') {
+                        console.log(`[AskSttService] Transcription completed: "${message.transcript}"`);
+                        transcriptionResult = message.transcript;
+                        cleanup();
+                        resolve(transcriptionResult);
+                    } else if (message.type === 'conversation.item.input_audio_transcription.failed') {
+                        console.error('[AskSttService] Transcription failed:', message.error);
+                        cleanup();
+                        reject(new Error(`Transcription failed: ${message.error?.message || 'Unknown error'}`));
+                    } else if (message.type === 'input_audio_buffer.committed') {
+                        console.log('[AskSttService] Audio buffer committed, waiting for transcription...');
+                    } else if (message.type === 'session.created' || message.type === 'session.updated') {
+                        console.log(`[AskSttService] Session event: ${message.type}`);
+                    } else {
+                        console.log(`[AskSttService] Unhandled message type: ${message.type}`);
+                    }
+                } catch (error) {
+                    console.error('[AskSttService] Error parsing WebSocket message:', error);
+                    console.log('[AskSttService] Raw message:', event.data);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('[AskSttService] Direct transcription WebSocket error:', error);
+                cleanup();
+                reject(error);
+            };
+            
+            ws.onclose = () => {
+                console.log('[AskSttService] Direct transcription WebSocket closed');
+                if (!transcriptionResult) {
+                    reject(new Error('WebSocket closed without transcription result'));
+                }
+            };
+        });
+    }
+
+    convertPCMToWAV(base64PCM) {
+        // Convert base64 PCM16 to WAV format
+        const pcmBuffer = Buffer.from(base64PCM, 'base64');
+        const sampleRate = 16000;
+        const channels = 1;
+        const bitsPerSample = 16;
+        
+        // WAV header
+        const header = Buffer.alloc(44);
+        header.write('RIFF', 0);
+        header.writeUInt32LE(36 + pcmBuffer.length, 4);
+        header.write('WAVE', 8);
+        header.write('fmt ', 12);
+        header.writeUInt32LE(16, 16);
+        header.writeUInt16LE(1, 20);
+        header.writeUInt16LE(channels, 22);
+        header.writeUInt32LE(sampleRate, 24);
+        header.writeUInt32LE(sampleRate * channels * bitsPerSample / 8, 28);
+        header.writeUInt16LE(channels * bitsPerSample / 8, 32);
+        header.writeUInt16LE(bitsPerSample, 34);
+        header.write('data', 36);
+        header.writeUInt32LE(pcmBuffer.length, 40);
+        
+        return Buffer.concat([header, pcmBuffer]);
+    }
+
     isActive() {
         return !!this.sttSession && this.isListening;
     }

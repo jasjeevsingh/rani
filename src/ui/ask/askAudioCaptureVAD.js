@@ -60,6 +60,7 @@ class AskAudioCaptureVAD {
     async initializeVAD() {
         try {
             console.log('[VAD] Initializing Voice Activity Detection...');
+            console.log('[VAD] VAD config:', this.vadConfig);
             
             this.vad = await MicVAD.new({
                 ...this.vadConfig,
@@ -450,5 +451,36 @@ class AskAudioCaptureVAD {
 
 // Create and export global instance
 window.askAudioCaptureVAD = new AskAudioCaptureVAD();
+
+// Create compatibility layer for existing askAudioCapture interface
+window.askAudioCapture = {
+    async startCapture() {
+        console.log('[VAD Compat] Starting VAD conversation mode');
+        try {
+            const result = await window.askAudioCaptureVAD.startConversationMode();
+            console.log('[VAD Compat] Start result:', result);
+            return result;
+        } catch (error) {
+            console.error('[VAD Compat] Error starting VAD:', error);
+            return false;
+        }
+    },
+    
+    async stopCapture() {
+        console.log('[VAD Compat] Stopping VAD conversation mode');
+        try {
+            const result = await window.askAudioCaptureVAD.stopConversationMode();
+            console.log('[VAD Compat] Stop result:', result);
+            return result;
+        } catch (error) {
+            console.error('[VAD Compat] Error stopping VAD:', error);
+            return false;
+        }
+    },
+    
+    isActive() {
+        return window.askAudioCaptureVAD.isActive();
+    }
+};
 
 export default window.askAudioCaptureVAD;

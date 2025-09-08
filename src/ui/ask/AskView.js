@@ -1,7 +1,6 @@
 import { html, css, LitElement } from '../../ui/assets/lit-core-2.7.4.min.js';
 import { parser, parser_write, parser_end, default_renderer } from '../../ui/assets/smd.js';
-import './askAudioCapture.js';
-import '../ask/askAudioCapture.js';
+import './askAudioCaptureVADSafe.js';
 
 export class AskView extends LitElement {
     static properties = {
@@ -949,11 +948,10 @@ export class AskView extends LitElement {
 
         console.log(`🔍 [Debug] connectedCallback - loaded flag: ${this.conversationHistoryLoaded}, history length: ${this.conversationHistory.length}`);
         console.log('📱 AskView connectedCallback - IPC 이벤트 리스너 설정');
-
+        
         // Load conversation history when component mounts
-        this.loadConversationHistory();
-
-        document.addEventListener('keydown', this.handleEscKey);
+        // TODO: Implement conversation history loading
+        // this.loadConversationHistory();        document.addEventListener('keydown', this.handleEscKey);
 
         this.resizeObserver = new ResizeObserver(entries => {
             for (const entry of entries) {
@@ -1170,6 +1168,99 @@ export class AskView extends LitElement {
 
             console.log('AskView: IPC 이벤트 리스너 등록 완료');
         }
+
+        // Initialize VAD system with error handling
+        this.initializeVADSafely();
+    }
+
+    /**
+     * Safely initialize VAD system with fallback handling
+     */
+    async initializeVADSafely() {
+        try {
+            // Wait a bit for the VAD module to load
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            if (window.askAudioCaptureVAD) {
+                console.log('[AskView] Setting up VAD callbacks');
+                
+                // Set up VAD callbacks
+                window.askAudioCaptureVAD.onSpeechStart = () => {
+                    this.handleVADStateChange('speechStarted');
+                };
+                
+                window.askAudioCaptureVAD.onSpeechEnd = () => {
+                    this.handleVADStateChange('speechEnded');
+                };
+                
+                window.askAudioCaptureVAD.onVoiceActivity = (isActive) => {
+                    this.updateVoiceActivity(isActive);
+                };
+                
+                window.askAudioCaptureVAD.onInterruption = () => {
+                    this.handleVADStateChange('interrupted');
+                };
+                
+                console.log('[AskView] VAD callbacks configured successfully');
+                console.log('[AskView] VAD state:', window.askAudioCaptureVAD.getState());
+                
+            } else {
+                console.warn('[AskView] VAD system not available, using fallback');
+            }
+        } catch (error) {
+            console.error('[AskView] Error initializing VAD:', error);
+        }
+    }
+
+    /**
+     * Handle VAD state changes from the Voice Activity Detection system
+     */
+    handleVADStateChange(event, data = {}) {
+        console.log(`[AskView] VAD state change: ${event}`, data);
+        
+        switch (event) {
+            case 'conversationStarted':
+                this.isListening = true;
+                this.voiceActivity = false;
+                console.log('[AskView] VAD conversation mode started');
+                break;
+                
+            case 'conversationEnded':
+                this.isListening = false;
+                this.voiceActivity = false;
+                console.log('[AskView] VAD conversation mode ended');
+                break;
+                
+            case 'speechStarted':
+                this.voiceActivity = true;
+                console.log('[AskView] VAD detected speech start');
+                break;
+                
+            case 'speechEnded':
+                this.voiceActivity = false;
+                console.log('[AskView] VAD detected speech end');
+                break;
+                
+            case 'processingStarted':
+                this.isLoading = true;
+                console.log('[AskView] VAD processing speech');
+                break;
+                
+            case 'processingEnded':
+                this.isLoading = false;
+                console.log('[AskView] VAD finished processing');
+                break;
+                
+            case 'interrupted':
+                console.log('[AskView] VAD detected interruption');
+                break;
+                
+            default:
+                console.log(`[AskView] Unknown VAD event: ${event}`);
+        }
+        
+        // Update UI
+        this.requestUpdate();
     }
 
     disconnectedCallback() {
@@ -1196,6 +1287,15 @@ export class AskView extends LitElement {
 
         // Stop any playing speech
         this.stopSpeaking();
+
+        // Cleanup VAD safely
+        if (window.askAudioCaptureVAD) {
+            try {
+                window.askAudioCaptureVAD.cleanup();
+            } catch (error) {
+                console.error('[AskView] Error cleaning up VAD:', error);
+            }
+        }
 
         if (window.api) {
             window.api.askView.removeOnAskStateUpdate(this.handleAskStateUpdate);
@@ -1739,26 +1839,27 @@ export class AskView extends LitElement {
 
     async handleMicClick() {
         try {
+            console.log('[AskView] handleMicClick - isListening:', this.isListening);
+            console.log('[AskView] window.askAudioCapture available:', !!window.askAudioCapture);
+            
             if (this.isListening) {
-                // Stop voice input
-                await window.api.askView.stopVoiceInput();
+                // Stop VAD conversation mode
                 if (window.askAudioCapture) {
-                    window.askAudioCapture.stopCapture();
+                    console.log('[AskView] Stopping VAD conversation mode');
+                    await window.askAudioCapture.stopCapture();
+                } else {
+                    console.error('[AskView] No askAudioCapture available for stopping');
                 }
             } else {
-                // Start voice input
-                const result = await window.api.askView.startVoiceInput();
-                if (result.success) {
-                    // Start audio capture
-                    if (window.askAudioCapture) {
-                        const captureStarted = await window.askAudioCapture.startCapture();
-                        if (!captureStarted) {
-                            console.error('[AskView] Failed to start audio capture');
-                            await window.api.askView.stopVoiceInput();
-                        }
+                // Start VAD conversation mode (VAD will manage STT internally)
+                if (window.askAudioCapture) {
+                    console.log('[AskView] Starting VAD conversation mode');
+                    const captureStarted = await window.askAudioCapture.startCapture();
+                    if (!captureStarted) {
+                        console.error('[AskView] Failed to start audio capture');
                     }
                 } else {
-                    console.error('[AskView] Failed to start voice input:', result.error);
+                    console.error('[AskView] VAD audio capture not available');
                 }
             }
         } catch (error) {

@@ -159,6 +159,7 @@ contextBridge.exposeInMainWorld('api', {
     stopVoiceInput: () => ipcRenderer.invoke('ask:stopVoiceInput'),
     toggleVoiceInput: () => ipcRenderer.invoke('ask:toggleVoiceInput'),
     sendAudioData: (data, mimeType) => ipcRenderer.invoke('ask:sendAudioData', { data, mimeType }),
+    transcribeAudioDirect: (data, mimeType) => ipcRenderer.invoke('ask:transcribeAudioDirect', { data, mimeType }),
 
     // Listeners
     onAskStateUpdate: (callback) => ipcRenderer.on('ask:stateUpdate', callback),

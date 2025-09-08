@@ -152,8 +152,10 @@ class AskService {
     }
 
     setupSttCallbacks() {
+        console.log('[AskService] Setting up STT callbacks...');
         this.sttService.setCallbacks({
             onTranscriptionUpdate: (text, isFinal) => {
+                console.log(`[AskService] STT transcription update: "${text}", isFinal: ${isFinal}`);
                 this.state.sttTranscription = text;
                 this._broadcastState();
                 
@@ -175,7 +177,10 @@ class AskService {
                 
                 // Auto-submit the transcribed text
                 if (text.trim()) {
+                    console.log('[AskService] Auto-submitting transcribed text:', text.trim());
                     this.sendMessage(text.trim());
+                } else {
+                    console.log('[AskService] Transcribed text is empty, not submitting');
                 }
                 
                 // Send completion to the ask window
@@ -569,6 +574,10 @@ class AskService {
                 return { success: false, error: 'Already listening' };
             }
 
+            // Ensure callbacks are configured before initializing session
+            console.log('[AskService] Configuring STT callbacks for voice input session');
+            this.setupSttCallbacks();
+
             // Initialize STT session if not already done
             const initialized = await this.sttService.initializeSession();
             if (!initialized) {
@@ -615,13 +624,44 @@ class AskService {
     /**
      * Send audio data to STT service
      */
+    /**
+     * Direct transcription method that bypasses streaming callbacks
+     */
+    async transcribeAudioDirect(base64AudioData, mimeType = 'audio/pcm;rate=16000') {
+        try {
+            console.log(`[AskService] Direct transcription - data size: ${base64AudioData.length}`);
+            
+            // Create a new STT service instance for one-shot transcription
+            const AskSttService = require('./stt/askSttService');
+            const directSttService = new AskSttService();
+            
+            // Set up a promise-based callback system
+            const transcriptionResult = await directSttService.transcribeCompleteAudio(base64AudioData, mimeType);
+            
+            if (transcriptionResult && transcriptionResult.trim()) {
+                console.log(`[AskService] Direct transcription successful: "${transcriptionResult}"`);
+                return transcriptionResult.trim();
+            } else {
+                throw new Error('No transcription result received');
+            }
+        } catch (error) {
+            console.error('[AskService] Direct transcription error:', error);
+            throw error;
+        }
+    }
+
     async sendAudioData(data, mimeType) {
         try {
+            console.log(`[AskService] sendAudioData called - isListening: ${this.state.isListening}, data size: ${data.length}`);
+            
             if (!this.state.isListening) {
+                console.warn('[AskService] Rejecting audio data - not listening for voice input');
                 return { success: false, error: 'Not listening for voice input' };
             }
 
+            console.log('[AskService] Sending audio data to STT service...');
             await this.sttService.sendAudioData(data, mimeType);
+            console.log('[AskService] Audio data sent successfully to STT service');
             return { success: true };
         } catch (error) {
             console.error('[AskService] Error sending audio data:', error);
