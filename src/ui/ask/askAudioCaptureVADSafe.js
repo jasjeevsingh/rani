@@ -40,6 +40,7 @@ class AskAudioCaptureVADSafe {
         this.onSpeechSegment = null;
         this.onVoiceActivity = null;
         this.onInterruption = null;
+        this.onTranscriptionComplete = null;
         
         // Initialize VAD with error handling
         this.initializeVADSafely();
@@ -457,12 +458,13 @@ class AskAudioCaptureVADSafe {
                 console.log('🔄 [VAD-Debug] Direct transcription result:', transcriptText);
                 
                 if (transcriptText && transcriptText.trim()) {
-                    // Send the transcribed text directly to the AI via sendMessage
-                    console.log('🤖 [VAD-Debug] Sending transcribed text to AI:', transcriptText.trim());
-                    const aiResponse = await window.api.askView.sendMessage(transcriptText.trim());
-                    console.log('✅ [VAD-Debug] AI response received');
+                    // Notify the UI with the completed transcription
+                    // This will trigger the normal text submission workflow
+                    console.log('📝 [VAD-Debug] Notifying UI with transcribed text:', transcriptText.trim());
+                    this.notifyTranscriptionComplete(transcriptText.trim());
+                    console.log('✅ [VAD-Debug] Transcription sent to UI for processing');
                 } else {
-                    console.log('⚠️ [VAD-Debug] Transcription was empty, not sending to AI');
+                    console.log('⚠️ [VAD-Debug] Transcription was empty, not sending to UI');
                 }
             } catch (error) {
                 console.error('💥 [VAD-Debug] Error in direct transcription:', error);
@@ -610,6 +612,23 @@ class AskAudioCaptureVADSafe {
         
         window.dispatchEvent(new CustomEvent(`vad-${event}`, { 
             detail: { ...data, state: this.getState() } 
+        }));
+    }
+
+    /**
+     * Notify transcription completion to UI components
+     */
+    notifyTranscriptionComplete(transcriptText) {
+        console.log('[VAD-Safe] Notifying transcription completion to UI');
+        
+        // Call the UI callback if it exists
+        if (this.onTranscriptionComplete && typeof this.onTranscriptionComplete === 'function') {
+            this.onTranscriptionComplete(transcriptText);
+        }
+        
+        // Also dispatch as a custom event for additional listeners
+        window.dispatchEvent(new CustomEvent('vad-transcription-complete', {
+            detail: { transcriptText, state: this.getState() }
         }));
     }
 

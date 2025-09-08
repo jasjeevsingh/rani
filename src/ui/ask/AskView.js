@@ -1201,6 +1201,11 @@ export class AskView extends LitElement {
                     this.handleVADStateChange('interrupted');
                 };
                 
+                // Add callback for when transcription is completed
+                window.askAudioCaptureVAD.onTranscriptionComplete = (transcriptText) => {
+                    this.handleTranscriptionComplete(transcriptText);
+                };
+                
                 console.log('[AskView] VAD callbacks configured successfully');
                 console.log('[AskView] VAD state:', window.askAudioCaptureVAD.getState());
                 
@@ -1261,6 +1266,24 @@ export class AskView extends LitElement {
         
         // Update UI
         this.requestUpdate();
+    }
+
+    /**
+     * Handle completed transcription from VAD system
+     * This triggers the normal text submission workflow
+     */
+    async handleTranscriptionComplete(transcriptText) {
+        console.log(`[AskView] Transcription completed: "${transcriptText}"`);
+        
+        if (transcriptText && transcriptText.trim()) {
+            console.log('[AskView] Submitting transcribed text through normal workflow');
+            
+            // Use the existing handleSendText method to process the transcribed text
+            // This ensures it goes through the normal UI flow and appears in chat history
+            await this.handleSendText(null, transcriptText.trim());
+        } else {
+            console.log('[AskView] Transcription was empty, not submitting');
+        }
     }
 
     disconnectedCallback() {
