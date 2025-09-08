@@ -230,6 +230,7 @@ class AskService {
         const hasContent = this.state.isLoading || this.state.isStreaming || (this.state.currentResponse && this.state.currentResponse.length > 0);
 
         if (askWindow && askWindow.isVisible() && hasContent) {
+            // When ask button is clicked and there's content, toggle the input bar
             this.state.showTextInput = !this.state.showTextInput;
             this._broadcastState();
         } else {
@@ -304,7 +305,7 @@ class AskService {
             isStreaming: false,
             currentQuestion: userPrompt,
             currentResponse: '',
-            showTextInput: false,
+            showTextInput: true,  // Keep input bar visible during processing
         };
         this._broadcastState();
 

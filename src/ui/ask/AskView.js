@@ -191,6 +191,8 @@ export class AskView extends LitElement {
             box-sizing: border-box;
             position: relative;
             overflow: hidden;
+            max-height: 700px; /* Ensure container doesn't exceed maximum */
+        }
         }
 
         .ask-container::before {
@@ -497,20 +499,17 @@ export class AskView extends LitElement {
             align-items: center;
             gap: 8px;
             padding: 12px 16px;
-            background: rgba(0, 0, 0, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             border-top: 1px solid rgba(255, 255, 255, 0.1);
-            flex-shrink: 0;
             transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
             transform-origin: bottom;
+            flex-shrink: 0; /* Never shrink the input bar */
+            backdrop-filter: blur(10px);
+            border-radius: 0 0 12px 12px; /* Match parent container radius */
         }
 
-        /* Sticky input box when focus lock is active */
+        /* Enhanced styling when focus lock is active */
         :host(.focus-lock) .text-input-container {
-            position: sticky;
-            bottom: 0;
-            z-index: 10;
-            backdrop-filter: blur(10px);
-            background: rgba(0, 0, 0, 0.8);
             border-top: 1px solid rgba(255, 255, 255, 0.2);
         }
 
@@ -819,10 +818,12 @@ export class AskView extends LitElement {
 
         /* Conversation History Styles */
         .conversation-container {
-            max-height: 600px;
+            flex: 1;
             overflow-y: auto;
             padding: 16px;
             background: transparent;
+            min-height: 0; /* Allow flexbox to shrink this */
+            max-height: 600px; /* Conservative max height to ensure input bar space */
         }
 
         .conversation-container::-webkit-scrollbar {
@@ -1683,20 +1684,6 @@ export class AskView extends LitElement {
         }
     }
 
-    addToConversationHistory(role, content, timestamp = Date.now()) {
-        if (this.conversationHistory.some(msg => msg.role === role && msg.content.trim() === content.trim())) {
-            console.warn(`[History] Duplicate message detected, skipping: "${content}"`);
-            return; // Avoid adding duplicate messages
-        }
-        this.conversationHistory.push({
-            id: `temp-${Date.now()}`,
-            role,
-            content,
-            timestamp
-        });
-        this.requestUpdate();
-    }
-
     async handleSendText(e, overridingText = '') {
         const textInput = this.shadowRoot?.getElementById('textInput');
         const text = (overridingText || textInput?.value || '').trim();
@@ -2236,12 +2223,13 @@ export class AskView extends LitElement {
             if (!headerEl || !conversationEl) return;
 
             const headerHeight = headerEl.classList.contains('hidden') ? 0 : headerEl.offsetHeight;
-            const conversationHeight = conversationEl.scrollHeight;
             const inputHeight = (inputEl && !inputEl.classList.contains('hidden')) ? inputEl.offsetHeight : 0;
-
-            const idealHeight = headerHeight + conversationHeight + inputHeight;
-
-            const targetHeight = Math.min(700, idealHeight);
+            
+            // Ensure conversation content doesn't exceed reasonable bounds
+            const maxConversationHeight = 580; // Conservative max to always leave room for input
+            const conversationHeight = Math.min(conversationEl.scrollHeight, maxConversationHeight);
+            
+            const targetHeight = Math.min(700, headerHeight + conversationHeight + inputHeight);
 
             window.api.askView.adjustWindowHeight("ask", targetHeight);
 
