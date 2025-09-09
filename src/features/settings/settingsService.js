@@ -205,7 +205,7 @@ function getDefaultSettings() {
         profile: 'school',
         language: 'en',
         screenshotInterval: '5000',
-        imageQuality: '0.8',
+        imageQuality: '0.95',  // Increased from 0.8 to 0.95 for better text recognition
         layoutMode: 'stacked',
         keybinds: isMac ? DEFAULT_KEYBINDS.mac : DEFAULT_KEYBINDS.windows,
         throttleTokens: 500,

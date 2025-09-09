@@ -40,19 +40,29 @@ let lastScreenshot = null;
 async function captureScreenshot(options = {}) {
     if (process.platform === 'darwin') {
         try {
-            const tempPath = path.join(os.tmpdir(), `screenshot-${Date.now()}.jpg`);
+            const tempPath = path.join(os.tmpdir(), `screenshot-${Date.now()}.png`);
 
-            await execFile('screencapture', ['-x', '-t', 'jpg', tempPath]);
+            await execFile('screencapture', ['-x', '-t', 'png', tempPath]);
 
             const imageBuffer = await fs.promises.readFile(tempPath);
             await fs.promises.unlink(tempPath);
 
             if (sharp) {
                 try {
-                    // Try using sharp for optimal image processing
+                    // Optimized for text recognition with higher quality
                     const resizedBuffer = await sharp(imageBuffer)
-                        .resize({ height: 384 })
-                        .jpeg({ quality: 80 })
+                        .resize({ 
+                            width: 1920, 
+                            height: 1080, 
+                            fit: 'inside',
+                            withoutEnlargement: true 
+                        })
+                        .sharpen()  // Add sharpening for text clarity
+                        .jpeg({ 
+                            quality: 95,
+                            progressive: false,
+                            mozjpeg: true  // Better compression algorithm
+                        })
                         .toBuffer();
 
                     const base64 = resizedBuffer.toString('base64');
@@ -93,8 +103,8 @@ async function captureScreenshot(options = {}) {
         const sources = await desktopCapturer.getSources({
             types: ['screen'],
             thumbnailSize: {
-                width: 1920,
-                height: 1080,
+                width: 3840,   // 4K width for better text recognition
+                height: 2160,  // 4K height for better text recognition
             },
         });
 
@@ -102,7 +112,7 @@ async function captureScreenshot(options = {}) {
             throw new Error('No screen sources available');
         }
         const source = sources[0];
-        const buffer = source.thumbnail.toJPEG(70);
+        const buffer = source.thumbnail.toJPEG(95); // Higher quality for text recognition
         const base64 = buffer.toString('base64');
         const size = source.thumbnail.getSize();
 
