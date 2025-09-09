@@ -908,6 +908,9 @@ export class AskView extends LitElement {
         this.conversationHistory = [];
         this.conversationHistoryLoaded = false; // Flag to prevent duplicate loading
 
+        // TTS chunking state
+        this.isChunkedTTSActive = false;
+
         // Focus lock for latest exchange mode
         this.focusLock = false; // when true, only latest exchange is visible
         this.lastUserMessage = null; // reference to last user message element
@@ -1166,6 +1169,18 @@ export class AskView extends LitElement {
                 this.speakConversationalResponse(data.text);
             });
 
+            // Streaming conversational chunks for TTS
+            console.log('[AskView] Setting up conversational chunk listener. API available:', !!window.api.askView.onConversationalChunk);
+            if (window.api.askView.onConversationalChunk) {
+                window.api.askView.onConversationalChunk((event, data) => {
+                    console.log(`[AskView] Received conversational chunk for TTS: "${data.text}"`);
+                    this.handleConversationalChunk(data);
+                });
+                console.log('[AskView] Conversational chunk listener registered successfully');
+            } else {
+                console.error('[AskView] onConversationalChunk not available in API');
+            }
+
             console.log('AskView: IPC 이벤트 리스너 등록 완료');
         }
 
@@ -1181,33 +1196,36 @@ export class AskView extends LitElement {
             // Wait a bit for the VAD module to load
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            if (window.askAudioCaptureVAD) {
-                console.log('[AskView] Setting up VAD callbacks');
+            // Try both possible VAD instance names
+            const vadInstance = window.askAudioCaptureVAD || window.askAudioCapture;
+            
+            if (vadInstance) {
+                console.log('[AskView] Setting up VAD callbacks on instance:', vadInstance.constructor?.name || 'unknown');
                 
                 // Set up VAD callbacks
-                window.askAudioCaptureVAD.onSpeechStart = () => {
+                vadInstance.onSpeechStart = () => {
                     this.handleVADStateChange('speechStarted');
                 };
                 
-                window.askAudioCaptureVAD.onSpeechEnd = () => {
+                vadInstance.onSpeechEnd = () => {
                     this.handleVADStateChange('speechEnded');
                 };
                 
-                window.askAudioCaptureVAD.onVoiceActivity = (isActive) => {
+                vadInstance.onVoiceActivity = (isActive) => {
                     this.updateVoiceActivity(isActive);
                 };
                 
-                window.askAudioCaptureVAD.onInterruption = () => {
+                vadInstance.onInterruption = () => {
                     this.handleVADStateChange('interrupted');
                 };
                 
                 // Add callback for when transcription is completed
-                window.askAudioCaptureVAD.onTranscriptionComplete = (transcriptText) => {
+                vadInstance.onTranscriptionComplete = (transcriptText) => {
                     this.handleTranscriptionComplete(transcriptText);
                 };
                 
                 console.log('[AskView] VAD callbacks configured successfully');
-                console.log('[AskView] VAD state:', window.askAudioCaptureVAD.getState());
+                console.log('[AskView] VAD state:', vadInstance.getState ? vadInstance.getState() : 'getState not available');
                 
             } else {
                 console.warn('[AskView] VAD system not available, using fallback');
@@ -1326,6 +1344,7 @@ export class AskView extends LitElement {
             window.api.askView.removeOnScrollResponseUp(this.handleScroll);
             window.api.askView.removeOnScrollResponseDown(this.handleScroll);
             window.api.askView.removeOnConversationalResponse();
+            window.api.askView.removeOnConversationalChunk();
             console.log('✅ AskView: IPC 이벤트 리스너 제거 필요');
         }
 
@@ -2045,6 +2064,12 @@ export class AskView extends LitElement {
      */
     async speakConversationalResponse(text) {
         try {
+            // If chunked TTS is active, skip the fallback conversational response
+            if (this.isChunkedTTSActive) {
+                console.log('[AskView] Skipping fallback conversational response - chunked TTS is active');
+                return;
+            }
+
             // Stop any currently playing speech
             this.stopSpeaking();
 
@@ -2079,6 +2104,102 @@ export class AskView extends LitElement {
             // Fallback to Web Speech API
             console.log('[AskView] Falling back to Web Speech API');
             this.speakWithWebSpeechAPI(text);
+        }
+    }
+
+    /**
+     * Handle streaming conversational chunks for TTS
+     * This enables faster voice response by speaking chunks as they arrive
+     */
+    async handleConversationalChunk(data) {
+        const { text, isComplete } = data;
+        
+        if (!text || text.trim().length === 0) {
+            console.log('[AskView] Empty chunk received, skipping');
+            return;
+        }
+
+        console.log(`[AskView] Processing TTS chunk: "${text}" (complete: ${isComplete})`);
+        
+        try {
+            // For the first chunk, stop any currently playing speech and initialize queue
+            const isFirstChunk = !this.isChunkedTTSActive;
+            if (isFirstChunk) {
+                this.stopSpeaking();
+                this.isChunkedTTSActive = true;
+                this.chunkQueue = [];
+                this.chunkIndex = 0;
+                this.processingChunks = false;
+                console.log('[AskView] Started chunked TTS mode');
+            }
+
+            // Add chunk to queue for sequential processing
+            const chunkData = { text, index: this.chunkIndex++, isComplete };
+            this.chunkQueue.push(chunkData);
+            console.log(`[AskView] Queued chunk ${chunkData.index}: "${text}"`);
+
+            // Start processing queue if not already processing
+            if (!this.processingChunks) {
+                this.processChunkQueue();
+            }
+            
+            // Reset chunked mode when complete
+            if (isComplete) {
+                console.log('[AskView] All chunks received, waiting for playback to complete');
+            }
+            
+        } catch (error) {
+            console.error('[AskView] Error processing TTS chunk:', error);
+            
+            // Fallback to Web Speech API
+            this.speakWithWebSpeechAPI(text);
+            
+            if (isComplete) {
+                this.isChunkedTTSActive = false;
+            }
+        }
+    }
+
+    async processChunkQueue() {
+        if (this.processingChunks) return;
+        this.processingChunks = true;
+
+        try {
+            while (this.chunkQueue.length > 0) {
+                const chunk = this.chunkQueue.shift();
+                
+                console.log(`[AskView] Speaking chunk ${chunk.index}: "${chunk.text}"`);
+                const result = await window.api.voice.speakWithOpenAI(chunk.text, {
+                    voice: 'nova',
+                    model: 'tts-1',
+                    speed: 1.4,
+                    pitch: 2.0,
+                    volume: 0.8,
+                    interrupt: chunk.index === 0 // Only interrupt for first chunk
+                });
+                
+                if (!result.success && result.fallback) {
+                    console.log('[AskView] OpenAI TTS not available for chunk, using Web Speech API');
+                    this.speakWithWebSpeechAPI(chunk.text);
+                } else if (!result.success) {
+                    console.error('[AskView] TTS chunk failed:', result.error);
+                }
+
+                // Wait between chunks to ensure sequential playback
+                // if (this.chunkQueue.length > 0) {
+                //     await new Promise(resolve => setTimeout(resolve, 300));
+                // }
+                
+                // Check if this was the last chunk and mark completion
+                if (chunk.isComplete && this.chunkQueue.length === 0) {
+                    console.log('[AskView] Chunked TTS sequence completed');
+                    this.isChunkedTTSActive = false;
+                    this.chunkQueue = [];
+                    this.chunkIndex = 0;
+                }
+            }
+        } finally {
+            this.processingChunks = false;
         }
     }
 

@@ -17,16 +17,16 @@ class AskAudioCaptureVAD {
         
         // VAD Configuration
         this.vadConfig = {
-            // Model quality: 'silero' (best) or 'legacy' (faster)
-            model: 'silero',
+            // Model quality: 'legacy' for faster processing
+            model: 'legacy',
             // Voice probability threshold (0-1, higher = more selective)
             startThreshold: 0.7,
-            endThreshold: 0.35,
+            endThreshold: 0.25, // Lower threshold for faster speech end detection
             // Minimum silence duration to end speech (ms)
-            minSilenceMs: 1000,
+            minSilenceMs: 100,
             // Maximum speech duration before forced segmentation (ms) 
             maxSpeechMs: 30000,
-            // Audio preprocessing
+            // Audio preprocessing - reduced for faster processing
             frameLengthMs: 30,
         };
         
@@ -181,26 +181,32 @@ class AskAudioCaptureVAD {
     async handleVADSpeechEnd(audio) {
         if (!this.isConversationMode) return;
         
-        console.log('[VAD] Speech ended, processing audio segment');
+        console.log('[VAD] Speech ended - immediate response');
         this.isSpeaking = false;
         this.lastSpeechTime = Date.now();
         
-        // Convert Float32Array to the format we need
+        // Immediately update UI to show speech has ended
+        this.notifyStateChange('speechEnded');
+        this.updateVoiceActivity(false);
+        
+        // Immediately notify callbacks for responsive UI feedback
         const audioBuffer = Array.from(audio);
-        this.currentSpeechBuffer.push(...audioBuffer);
-        
-        // Process the complete speech segment
-        await this.processSpeechSegment(this.currentSpeechBuffer);
-        this.currentSpeechBuffer = [];
-        
-        // Notify callbacks
         if (this.onSpeechEnd) {
             this.onSpeechEnd(audioBuffer);
         }
         
-        // Update UI
-        this.notifyStateChange('speechEnded');
-        this.updateVoiceActivity(false);
+        // Add audio to buffer for processing
+        this.currentSpeechBuffer.push(...audioBuffer);
+        
+        // Process audio in background without blocking VAD response
+        console.log('[VAD] Starting background audio processing');
+        setImmediate(() => {
+            this.processSpeechSegment(this.currentSpeechBuffer.slice()) // Create copy
+                .catch(error => {
+                    console.error('[VAD] Background processing error:', error);
+                });
+            this.currentSpeechBuffer = [];
+        });
     }
 
     /**

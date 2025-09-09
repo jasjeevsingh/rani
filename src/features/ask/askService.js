@@ -723,6 +723,7 @@ Conversational response:`;
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let conversationalResponse = '';
+            let sentenceBuffer = '';
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -742,11 +743,40 @@ Conversational response:`;
                             const token = json.choices[0]?.delta?.content || '';
                             if (token) {
                                 conversationalResponse += token;
+                                sentenceBuffer += token;
+                                
+                                // Check for sentence boundaries
+                                if (this._isSentenceComplete(sentenceBuffer)) {
+                                    console.log(`[AskService] Sending TTS chunk: "${sentenceBuffer.trim()}"`);
+                                    // Send chunk immediately for TTS
+                                    const askWin = getWindowPool()?.get('ask');
+                                    if (askWin && !askWin.isDestroyed()) {
+                                        askWin.webContents.send('ask:conversationalChunk', {
+                                            text: sentenceBuffer.trim(),
+                                            isComplete: false,
+                                            timestamp: Date.now()
+                                        });
+                                    }
+                                    sentenceBuffer = '';
+                                }
                             }
                         } catch (error) {
                             // Skip invalid JSON
                         }
                     }
+                }
+            }
+            
+            // Send any remaining text as final chunk
+            if (sentenceBuffer.trim()) {
+                console.log(`[AskService] Sending final TTS chunk: "${sentenceBuffer.trim()}"`);
+                const askWin = getWindowPool()?.get('ask');
+                if (askWin && !askWin.isDestroyed()) {
+                    askWin.webContents.send('ask:conversationalChunk', {
+                        text: sentenceBuffer.trim(),
+                        isComplete: true,
+                        timestamp: Date.now()
+                    });
                 }
             }
 
@@ -756,6 +786,28 @@ Conversational response:`;
             // Fallback: return a simple response
             return `I'll help you with that.`;
         }
+    }
+
+    /**
+     * Check if text contains a complete sentence
+     */
+    _isSentenceComplete(text) {
+        if (!text || text.trim().length < 20) return false; // Increased minimum length
+    
+        const trimmed = text.trim();
+        
+        // Only accept proper sentence endings: period, exclamation, question mark
+        // Must be followed by end of string OR space + capital letter (new sentence)
+        const properSentenceEnders = /[.!?](\s*$|\s+[A-Z])/;
+        
+        // Additional check: avoid breaking on abbreviations or decimals
+        const avoidBreaking = /\b[A-Z][a-z]*\.$|\d+\.$|etc\.$|vs\.$|Mr\.$|Mrs\.$|Dr\.$|Prof\.$/;
+        
+        if (avoidBreaking.test(trimmed)) {
+            return false;
+        }
+        
+        return properSentenceEnders.test(trimmed);
     }
 
     /**

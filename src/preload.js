@@ -182,6 +182,10 @@ contextBridge.exposeInMainWorld('api', {
     onConversationalResponse: (callback) => ipcRenderer.on('ask:conversationalResponse', callback),
     removeOnConversationalResponse: (callback) => ipcRenderer.removeListener('ask:conversationalResponse', callback),
 
+    // Streaming conversational chunks for TTS
+    onConversationalChunk: (callback) => ipcRenderer.on('ask:conversationalChunk', callback),
+    removeOnConversationalChunk: (callback) => ipcRenderer.removeListener('ask:conversationalChunk', callback),
+
     // Listeners
     onShowTextInput: (callback) => ipcRenderer.on('ask:showTextInput', callback),
     removeOnShowTextInput: (callback) => ipcRenderer.removeListener('ask:showTextInput', callback),
