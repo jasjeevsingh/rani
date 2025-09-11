@@ -342,6 +342,16 @@ class AskService {
             await askRepository.addAiMessage({ sessionId, role: 'user', content: userPrompt.trim() });
             console.log(`[AskService] DB: Saved user prompt to session ${sessionId}`);
             
+            // NEW: Automatically retrieve conversation history if not provided
+            if (conversationHistoryRaw.length === 0) {
+                const storedMessages = await askRepository.getAllAiMessagesBySessionId(sessionId);
+                // Convert database messages to conversation format, excluding the just-added user message
+                conversationHistoryRaw = storedMessages
+                    .slice(0, -1) // Exclude the message we just added
+                    .map(msg => `${msg.role}: ${msg.content}`);
+                console.log(`[AskService] Retrieved ${conversationHistoryRaw.length} messages from conversation history`);
+            }
+            
             const modelInfo = await modelStateService.getCurrentModelInfo('llm');
             if (!modelInfo || !modelInfo.apiKey) {
                 throw new Error('AI model or API key not configured.');
