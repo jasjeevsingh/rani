@@ -2640,10 +2640,11 @@ export class AskView extends LitElement {
                 const chunk = this.chunkQueue.shift();
                 
                 console.log(`[AskView] Speaking chunk ${chunk.index}: "${chunk.text}"`);
+                
                 const result = await window.api.voice.speakWithOpenAI(chunk.text, {
                     voice: 'nova',
                     model: 'tts-1',
-                    speed: 1.4,
+                    speed: 1.6, // Increased from 1.4 to 1.6 for faster speech
                     pitch: 2.0,
                     volume: 0.8,
                     interrupt: chunk.index === 0 // Only interrupt for first chunk
@@ -2656,10 +2657,10 @@ export class AskView extends LitElement {
                     console.error('[AskView] TTS chunk failed:', result.error);
                 }
 
-                // Wait between chunks to ensure sequential playback
-                // if (this.chunkQueue.length > 0) {
-                //     await new Promise(resolve => setTimeout(resolve, 300));
-                // }
+                // Minimal delay between chunks for smoother speech flow
+                if (this.chunkQueue.length > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 50)); // Reduced to 50ms
+                }
                 
                 // Check if this was the last chunk and mark completion
                 if (chunk.isComplete && this.chunkQueue.length === 0) {
