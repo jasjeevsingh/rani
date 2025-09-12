@@ -889,6 +889,34 @@ export class AskView extends LitElement {
         :host(.focus-lock) .conversation-container .conversation-message.current-response {
             display: block !important;
         }
+
+        /* KaTeX LaTeX Rendering Styles */
+        .katex {
+            font-size: 1em !important;
+            color: rgba(255, 255, 255, 0.95) !important;
+        }
+
+        .katex-display {
+            margin: 1em 0 !important;
+            text-align: center !important;
+        }
+
+        .katex .base {
+            color: rgba(255, 255, 255, 0.95) !important;
+        }
+
+        .katex .mord, .katex .mrel, .katex .mbin, .katex .mop {
+            color: rgba(255, 255, 255, 0.95) !important;
+        }
+
+        /* Ensure KaTeX elements work well with the dark theme */
+        .katex .mfrac > span > span {
+            border-color: rgba(255, 255, 255, 0.3) !important;
+        }
+
+        .katex .sqrt > .sqrt-line {
+            border-color: rgba(255, 255, 255, 0.7) !important;
+        }
     `;
 
     constructor() {
@@ -919,6 +947,7 @@ export class AskView extends LitElement {
         this.marked = null;
         this.hljs = null;
         this.DOMPurify = null;
+        this.katex = null;
         this.isLibrariesLoaded = false;
 
         // TTS (Text-to-Speech) for conversational responses
@@ -1045,6 +1074,7 @@ export class AskView extends LitElement {
                                       lastMessage.content.trim() === newState.currentResponse.trim();
                     
                     if (!isDuplicate) {
+                        // Save the original markdown content, not the rendered HTML
                         this.addToConversationHistory('assistant', newState.currentResponse);
                         console.log('📝 [Stream Complete] Added unique assistant response to history');
                     } else {
@@ -1359,20 +1389,36 @@ export class AskView extends LitElement {
     async loadLibraries() {
         try {
             if (!window.marked) {
-                await this.loadScript('../../assets/marked-4.3.0.min.js');
+                await this.loadScript('../assets/marked-4.3.0.min.js');
             }
 
             if (!window.hljs) {
-                await this.loadScript('../../assets/highlight-11.9.0.min.js');
+                await this.loadScript('../assets/highlight-11.9.0.min.js');
             }
 
             if (!window.DOMPurify) {
-                await this.loadScript('../../assets/dompurify-3.0.7.min.js');
+                await this.loadScript('../assets/dompurify-3.0.7.min.js');
+            }
+
+            // Load KaTeX for LaTeX rendering
+            if (!window.katex) {
+                console.log('[AskView] Loading KaTeX library from local assets...');
+                await this.loadScript('../assets/katex.min.js');
+                await this.loadCSS('../assets/katex.min.css');
+                console.log('[AskView] KaTeX library loaded, window.katex available:', !!window.katex);
             }
 
             this.marked = window.marked;
             this.hljs = window.hljs;
             this.DOMPurify = window.DOMPurify;
+            this.katex = window.katex;
+
+            console.log('[AskView] Library assignment complete:', {
+                marked: !!this.marked,
+                hljs: !!this.hljs,
+                DOMPurify: !!this.DOMPurify,
+                katex: !!this.katex
+            });
 
             if (this.marked && this.hljs) {
                 this.marked.setOptions({
@@ -1403,7 +1449,19 @@ export class AskView extends LitElement {
                 this.updateComplete.then(() => {
                     this.renderContent();
                 });
-                console.log('Markdown libraries loaded successfully in AskView');
+                console.log('All libraries loaded successfully in AskView including KaTeX');
+                
+                // Test KaTeX functionality
+                if (this.katex) {
+                    try {
+                        const testRender = this.katex.renderToString('E = mc^2', { throwOnError: false });
+                        console.log('[AskView] KaTeX test successful:', testRender.length > 0 ? 'PASS' : 'FAIL');
+                    } catch (error) {
+                        console.error('[AskView] KaTeX test failed:', error);
+                    }
+                } else {
+                    console.error('[AskView] KaTeX not available after library loading');
+                }
             }
 
             if (this.DOMPurify) {
@@ -1471,11 +1529,51 @@ export class AskView extends LitElement {
 
     loadScript(src) {
         return new Promise((resolve, reject) => {
+            // Check if script is already loaded
+            const existingScript = document.querySelector(`script[src="${src}"]`);
+            if (existingScript) {
+                console.log('[AskView] Script already loaded:', src);
+                resolve();
+                return;
+            }
+
+            console.log('[AskView] Loading script:', src);
             const script = document.createElement('script');
             script.src = src;
-            script.onload = resolve;
-            script.onerror = reject;
+            script.onload = () => {
+                console.log('[AskView] Script loaded successfully:', src);
+                resolve();
+            };
+            script.onerror = (error) => {
+                console.error('[AskView] Failed to load script:', src, error);
+                reject(error);
+            };
             document.head.appendChild(script);
+        });
+    }
+
+    loadCSS(href) {
+        return new Promise((resolve, reject) => {
+            const existingLink = document.querySelector(`link[href="${href}"]`);
+            if (existingLink) {
+                console.log('[AskView] CSS already loaded:', href);
+                resolve();
+                return;
+            }
+
+            console.log('[AskView] Loading CSS:', href);
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = href;
+            link.onload = () => {
+                console.log('[AskView] CSS loaded successfully:', href);
+                resolve();
+            };
+            link.onerror = (error) => {
+                console.error('[AskView] Failed to load CSS:', href, error);
+                reject(new Error(`Failed to load CSS: ${href}`));
+            };
+            document.head.appendChild(link);
         });
     }
 
@@ -1487,10 +1585,209 @@ export class AskView extends LitElement {
         }
 
         try {
-            return this.marked(text);
+            // First render LaTeX, then process markdown
+            const latexRendered = this.renderLaTeX(text);
+            return this.marked(latexRendered);
         } catch (error) {
             console.error('Markdown parsing error in AskView:', error);
             return text;
+        }
+    }
+
+    renderLaTeX(text) {
+        if (!this.katex) {
+            console.warn('[AskView] KaTeX not loaded, skipping LaTeX rendering. Available window.katex:', !!window.katex);
+            return text;
+        }
+
+        try {
+            console.log('[AskView] Rendering LaTeX for text:', text.substring(0, 100) + '...');
+            
+            let hasRendered = false;
+            
+            // Handle display math \[...\]
+            text = text.replace(/\\\[([\s\S]*?)\\\]/g, (match, latex) => {
+                try {
+                    console.log('[AskView] Rendering display math \\[\\]:', latex.trim());
+                    const rendered = this.katex.renderToString(latex.trim(), {
+                        displayMode: true,
+                        throwOnError: false,
+                        trust: false,
+                        strict: false
+                    });
+                    console.log('[AskView] Display math \\[\\] rendered successfully');
+                    hasRendered = true;
+                    return rendered;
+                } catch (error) {
+                    console.warn('[AskView] LaTeX display math \\[\\] render error:', error);
+                    return match; // Return original if rendering fails
+                }
+            });
+
+            // Handle inline math \(...\)
+            text = text.replace(/\\\(([\s\S]*?)\\\)/g, (match, latex) => {
+                try {
+                    console.log('[AskView] Rendering inline math \\(\\):', latex.trim());
+                    const rendered = this.katex.renderToString(latex.trim(), {
+                        displayMode: false,
+                        throwOnError: false,
+                        trust: false,
+                        strict: false
+                    });
+                    console.log('[AskView] Inline math \\(\\) rendered successfully');
+                    hasRendered = true;
+                    return rendered;
+                } catch (error) {
+                    console.warn('[AskView] LaTeX inline math \\(\\) render error:', error);
+                    return match; // Return original if rendering fails
+                }
+            });
+            
+            // Handle display math ($$...$$)
+            text = text.replace(/\$\$([\s\S]*?)\$\$/g, (match, latex) => {
+                try {
+                    console.log('[AskView] Rendering display math $$:', latex.trim());
+                    const rendered = this.katex.renderToString(latex.trim(), {
+                        displayMode: true,
+                        throwOnError: false,
+                        trust: false,
+                        strict: false
+                    });
+                    console.log('[AskView] Display math $$ rendered successfully');
+                    hasRendered = true;
+                    return rendered;
+                } catch (error) {
+                    console.warn('[AskView] LaTeX display math $$ render error:', error);
+                    return match; // Return original if rendering fails
+                }
+            });
+
+            // Handle inline math ($...$) - be careful not to match single $ used for currency
+            text = text.replace(/(?<!\$)\$(?!\$)([^$\n]+?)\$(?!\$)/g, (match, latex) => {
+                // Skip if it looks like currency (starts with digit or common currency words)
+                if (/^\s*\d/.test(latex) || /^\s*(USD|EUR|GBP|price|cost|dollar)/i.test(latex)) {
+                    return match;
+                }
+                
+                try {
+                    console.log('[AskView] Rendering inline math $:', latex.trim());
+                    const rendered = this.katex.renderToString(latex.trim(), {
+                        displayMode: false,
+                        throwOnError: false,
+                        trust: false,
+                        strict: false
+                    });
+                    console.log('[AskView] Inline math $ rendered successfully');
+                    hasRendered = true;
+                    return rendered;
+                } catch (error) {
+                    console.warn('[AskView] LaTeX inline math $ render error:', error);
+                    return match; // Return original if rendering fails
+                }
+            });
+
+            if (hasRendered) {
+                console.log('[AskView] LaTeX rendering completed with changes');
+            } else {
+                console.log('[AskView] LaTeX rendering completed but no expressions were rendered');
+            }
+
+            return text;
+        } catch (error) {
+            console.error('[AskView] LaTeX rendering error:', error);
+            return text;
+        }
+    }
+
+    parseMarkdownWithPreRenderedLatex(text) {
+        if (!this.marked) {
+            return text;
+        }
+
+        try {
+            // Use marked to parse markdown, but preserve KaTeX HTML
+            const parsedHtml = this.marked.parse(text);
+            
+            // Sanitize with extended allowlist for KaTeX
+            if (this.DOMPurify) {
+                return this.DOMPurify.sanitize(parsedHtml, {
+                    ALLOWED_TAGS: [
+                        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'b', 'em', 'i',
+                        'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'table', 'thead',
+                        'tbody', 'tr', 'th', 'td', 'hr', 'sup', 'sub', 'del', 'ins', 'span', 'div',
+                        // KaTeX math elements
+                        'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 
+                        'msqrt', 'mroot', 'mtext', 'mspace', 'mpadded', 'mphantom', 'mfenced', 
+                        'menclose', 'mstyle', 'munder', 'mover', 'munderover', 'mmultiscripts', 
+                        'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction'
+                    ],
+                    ALLOWED_ATTR: [
+                        'href', 'src', 'alt', 'title', 'class', 'id', 'target', 'rel',
+                        // KaTeX attributes
+                        'mathvariant', 'mathsize', 'mathcolor', 'mathbackground', 'dir', 
+                        'fontfamily', 'fontsize', 'fontweight', 'fontstyle', 'displaystyle', 
+                        'scriptlevel', 'rowspan', 'columnspan', 'rowalign', 'columnalign', 
+                        'groupalign', 'alignmentscope', 'columnwidth', 'width', 'rowspacing', 
+                        'columnspacing', 'rowlines', 'columnlines', 'frame', 'framespacing', 
+                        'equalrows', 'equalcolumns', 'side', 'minlabelspacing', 'accent', 
+                        'accentunder', 'align', 'numalign', 'denomalign', 'bevelled', 
+                        'linethickness', 'notation', 'selection', 'open', 'close', 'separators', 
+                        'subscriptshift', 'superscriptshift', 'lspace', 'rspace', 'stretchy', 
+                        'symmetric', 'maxsize', 'minsize', 'largeop', 'movablelimits', 
+                        'separator', 'fence', 'form', 'infix', 'prefix', 'postfix'
+                    ],
+                });
+            }
+            
+            return parsedHtml;
+        } catch (error) {
+            console.error('[AskView] Error parsing markdown with LaTeX:', error);
+            return text;
+        }
+    }
+
+    applyLatexToContainer(container) {
+        if (!this.katex || !container) return;
+        
+        try {
+            // Find all text nodes that might contain LaTeX
+            const walker = document.createTreeWalker(
+                container,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            
+            const textNodes = [];
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.nodeValue && (node.nodeValue.includes('$') || node.nodeValue.includes('\\'))) {
+                    textNodes.push(node);
+                }
+            }
+            
+            // Process each text node that might contain LaTeX
+            textNodes.forEach(textNode => {
+                const originalText = textNode.nodeValue;
+                const processedText = this.renderLaTeX(originalText);
+                
+                if (processedText !== originalText) {
+                    // Create a temporary container to parse the HTML
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = processedText;
+                    
+                    // Replace the text node with the rendered content
+                    const parent = textNode.parentNode;
+                    while (tempDiv.firstChild) {
+                        parent.insertBefore(tempDiv.firstChild, textNode);
+                    }
+                    parent.removeChild(textNode);
+                }
+            });
+            
+            console.log('[AskView] Applied LaTeX rendering to container');
+        } catch (error) {
+            console.error('[AskView] Error applying LaTeX to container:', error);
         }
     }
 
@@ -1524,8 +1821,14 @@ export class AskView extends LitElement {
         // Defer ALL DOM access until after render cycle completes to prevent LitElement crashes
         this.updateComplete.then(() => {
             const responseContainer = this.shadowRoot?.getElementById('currentResponseContent');
-            if (!responseContainer || !responseContainer.isConnected) {
-                console.warn('[renderContent] Response container not found or not connected to DOM');
+            if (!responseContainer) {
+                console.warn('[renderContent] Response container not found - likely no active response');
+                return;
+            }
+            
+            if (!responseContainer.isConnected) {
+                console.warn('[renderContent] Response container not connected to DOM - deferring');
+                setTimeout(() => this.renderContent(), 50);
                 return;
             }
 
@@ -1578,30 +1881,144 @@ export class AskView extends LitElement {
                 return;
             }
 
-            // 파서가 없거나 컨테이너가 변경되었으면 새로 생성
-            if (!this.smdParser || this.smdContainer !== responseContainer) {
-                this.smdContainer = responseContainer;
-                this.smdContainer.innerHTML = '';
-                
-                // smd.js의 default_renderer 사용
-                const renderer = default_renderer(this.smdContainer);
-                this.smdParser = parser(renderer);
-                this.lastProcessedLength = 0;
-            }
-
-            // 새로운 텍스트만 처리 (스트리밍 최적화)
-            const currentText = this.currentResponse;
-            const newText = currentText.slice(this.lastProcessedLength);
+            // Get the current response text
+            let textToRender = this.currentResponse || '';
             
-            if (newText.length > 0) {
-                // 새로운 텍스트 청크를 파서에 전달
-                parser_write(this.smdParser, newText);
-                this.lastProcessedLength = currentText.length;
+            // IMPORTANT: We need to process LaTeX BEFORE the SMD parser
+            // The SMD parser might escape or modify LaTeX expressions
+            if (this.katex && textToRender) {
+                console.log('[AskView] Processing LaTeX during streaming, text length:', textToRender.length);
+                console.log('[AskView] Current text sample:', textToRender.substring(0, 200) + '...');
+                
+                // Check for any LaTeX expressions (complete or partial)
+                const hasDisplayMath = textToRender.includes('$$');
+                const hasInlineMath = /\$[^$\n]+?\$/.test(textToRender);
+                const hasLatexDisplayBrackets = textToRender.includes('\\[');
+                const hasLatexInlineBrackets = textToRender.includes('\\(');
+                const hasSqrt = textToRender.includes('\\sqrt');
+                const hasFrac = textToRender.includes('\\frac');
+                const hasOtherLatex = /\\[a-zA-Z]+/.test(textToRender);
+                
+                console.log('[AskView] LaTeX indicators - Display:', hasDisplayMath, 'Inline:', hasInlineMath, 'Display\\[\\]:', hasLatexDisplayBrackets, 'Inline\\(\\):', hasLatexInlineBrackets, 'Sqrt:', hasSqrt, 'Frac:', hasFrac, 'Other:', hasOtherLatex);
+                
+                // If we detect any LaTeX content, try to render it
+                if (hasDisplayMath || hasInlineMath || hasLatexDisplayBrackets || hasLatexInlineBrackets || hasSqrt || hasFrac || hasOtherLatex) {
+                    console.log('[AskView] LaTeX content detected, attempting render...');
+                    const originalText = textToRender;
+                    textToRender = this.renderLaTeX(textToRender);
+                    
+                    if (textToRender !== originalText) {
+                        console.log('[AskView] LaTeX expressions found and processed during streaming');
+                        console.log('[AskView] Rendered text sample:', textToRender.substring(0, 200) + '...');
+                    } else {
+                        console.log('[AskView] No LaTeX changes made to text');
+                    }
+                } else {
+                    console.log('[AskView] No LaTeX content detected');
+                }
             }
 
-            // 스트리밍이 완료되면 파서 종료
-            if (!this.isStreaming && !this.isLoading) {
-                parser_end(this.smdParser);
+            // For conversation history rendering (when we have a complete response),
+            // render all at once instead of using streaming parser
+            if (textToRender.length > 0 && !this.isStreaming) {
+                console.log('[AskView] Rendering complete content (conversation history mode)');
+                
+                // Use marked.js for complete rendering when not streaming
+                if (this.marked) {
+                    const htmlContent = this.marked.parse(textToRender);
+                    if (this.DOMPurify) {
+                        responseContainer.innerHTML = this.DOMPurify.sanitize(htmlContent, {
+                            ALLOWED_TAGS: [
+                                'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'b', 'em', 'i',
+                                'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'table', 'thead',
+                                'tbody', 'tr', 'th', 'td', 'hr', 'sup', 'sub', 'del', 'ins', 'span', 'div',
+                                // KaTeX math elements
+                                'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 
+                                'msqrt', 'mroot', 'mtext', 'mspace', 'mpadded', 'mphantom', 'mfenced', 
+                                'menclose', 'mstyle', 'munder', 'mover', 'munderover', 'mmultiscripts', 
+                                'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction'
+                            ],
+                            ALLOWED_ATTR: [
+                                'href', 'src', 'alt', 'title', 'class', 'id', 'target', 'rel',
+                                // KaTeX attributes
+                                'mathvariant', 'mathsize', 'mathcolor', 'mathbackground', 'dir', 
+                                'fontfamily', 'fontsize', 'fontweight', 'fontstyle', 'displaystyle', 
+                                'scriptlevel', 'rowspan', 'columnspan', 'rowalign', 'columnalign', 
+                                'groupalign', 'alignmentscope', 'columnwidth', 'width', 'rowspacing', 
+                                'columnspacing', 'rowlines', 'columnlines', 'frame', 'framespacing', 
+                                'equalrows', 'equalcolumns', 'side', 'minlabelspacing', 'accent', 
+                                'accentunder', 'align', 'numalign', 'denomalign', 'bevelled', 
+                                'linethickness', 'notation', 'selection', 'open', 'close', 'separators', 
+                                'subscriptshift', 'superscriptshift', 'lspace', 'rspace', 'stretchy', 
+                                'symmetric', 'maxsize', 'minsize', 'largeop', 'movablelimits', 
+                                'separator', 'fence', 'form', 'infix', 'prefix', 'postfix'
+                            ],
+                        });
+                    } else {
+                        responseContainer.innerHTML = htmlContent;
+                    }
+                } else {
+                    // Fallback if marked is not available
+                    responseContainer.innerHTML = textToRender.replace(/\n/g, '<br>');
+                }
+                
+                // Apply code highlighting
+                if (this.hljs && responseContainer.isConnected) {
+                    responseContainer.querySelectorAll('pre code').forEach(block => {
+                        if (!block.hasAttribute('data-highlighted')) {
+                            try {
+                                this.hljs.highlightElement(block);
+                                block.setAttribute('data-highlighted', 'true');
+                            } catch (e) {
+                                console.warn('Code highlighting failed for block:', e);
+                            }
+                        }
+                    });
+                }
+                
+                return;
+            }
+
+            // Instead of using SMD streaming parser, let's use a simpler approach
+            // that preserves LaTeX rendering for streaming content
+            if (this.katex && textToRender.includes('<span class="katex">')) {
+                // If we have rendered LaTeX, use innerHTML directly
+                responseContainer.innerHTML = this.parseMarkdownWithPreRenderedLatex(textToRender);
+                console.log('[AskView] Used direct HTML rendering to preserve LaTeX');
+            } else {
+                // Use SMD parser for regular markdown streaming
+                // 파서가 없거나 컨테이너가 변경되었으면 새로 생성
+                if (!this.smdParser || this.smdContainer !== responseContainer) {
+                    this.smdContainer = responseContainer;
+                    this.smdContainer.innerHTML = '';
+                    
+                    // smd.js의 default_renderer 사용
+                    const renderer = default_renderer(this.smdContainer);
+                    this.smdParser = parser(renderer);
+                    this.lastProcessedLength = 0;
+                }
+
+                // 새로운 텍스트만 처리 (스트리밍 최적화)
+                // Use the LaTeX-processed text for streaming
+                const currentText = textToRender;
+                const newText = currentText.slice(this.lastProcessedLength);
+                
+                if (newText.length > 0) {
+                    // 새로운 텍스트 청크를 파서에 전달
+                    parser_write(this.smdParser, newText);
+                    this.lastProcessedLength = currentText.length;
+                }
+
+                // 스트리밍이 완료되면 파서 종료
+                if (!this.isStreaming && !this.isLoading) {
+                    parser_end(this.smdParser);
+                    
+                    // Final LaTeX pass for any remaining expressions
+                    if (this.katex) {
+                        console.log('[AskView] Applying final LaTeX pass after streaming complete');
+                        this.applyLatexToContainer(responseContainer);
+                    }
+                }
             }
 
             // 코드 하이라이팅 적용 (안전한 DOM 접근)
@@ -1636,17 +2053,37 @@ export class AskView extends LitElement {
         
         if (this.isLibrariesLoaded && this.marked && this.DOMPurify) {
             try {
-                // 마크다운 파싱
-                const parsedHtml = this.marked.parse(textToRender);
+                // Process LaTeX first, then markdown
+                const latexRendered = this.renderLaTeX(textToRender);
+                const parsedHtml = this.marked.parse(latexRendered);
 
-                // DOMPurify로 정제
+                // DOMPurify로 정제 with extended allowlist for KaTeX elements
                 const cleanHtml = this.DOMPurify.sanitize(parsedHtml, {
                     ALLOWED_TAGS: [
                         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'b', 'em', 'i',
                         'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'table', 'thead',
-                        'tbody', 'tr', 'th', 'td', 'hr', 'sup', 'sub', 'del', 'ins',
+                        'tbody', 'tr', 'th', 'td', 'hr', 'sup', 'sub', 'del', 'ins', 'span', 'div',
+                        // KaTeX math elements
+                        'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 
+                        'msqrt', 'mroot', 'mtext', 'mspace', 'mpadded', 'mphantom', 'mfenced', 
+                        'menclose', 'mstyle', 'munder', 'mover', 'munderover', 'mmultiscripts', 
+                        'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction'
                     ],
-                    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'id', 'target', 'rel'],
+                    ALLOWED_ATTR: [
+                        'href', 'src', 'alt', 'title', 'class', 'id', 'target', 'rel',
+                        // KaTeX attributes
+                        'mathvariant', 'mathsize', 'mathcolor', 'mathbackground', 'dir', 
+                        'fontfamily', 'fontsize', 'fontweight', 'fontstyle', 'displaystyle', 
+                        'scriptlevel', 'rowspan', 'columnspan', 'rowalign', 'columnalign', 
+                        'groupalign', 'alignmentscope', 'columnwidth', 'width', 'rowspacing', 
+                        'columnspacing', 'rowlines', 'columnlines', 'frame', 'framespacing', 
+                        'equalrows', 'equalcolumns', 'side', 'minlabelspacing', 'accent', 
+                        'accentunder', 'align', 'numalign', 'denomalign', 'bevelled', 
+                        'linethickness', 'notation', 'selection', 'open', 'close', 'separators', 
+                        'subscriptshift', 'superscriptshift', 'lspace', 'rspace', 'stretchy', 
+                        'symmetric', 'maxsize', 'minsize', 'largeop', 'movablelimits', 
+                        'separator', 'fence', 'form', 'infix', 'prefix', 'postfix'
+                    ],
                 });
 
                 responseContainer.innerHTML = cleanHtml;
@@ -1973,15 +2410,27 @@ export class AskView extends LitElement {
         if (!content) return '';
         
         try {
+            // Check if content is already rendered HTML (contains KaTeX spans)
+            if (content.includes('<span class="katex">') || content.includes('<math') || content.includes('<div') || content.includes('<p')) {
+                console.log('[AskView] Content appears to be pre-rendered HTML, returning as-is');
+                return content;
+            }
+            
             // Create a temporary container for rendering
             const tempContainer = document.createElement('div');
+            
+            // Process LaTeX first if available
+            let processedContent = content;
+            if (this.katex) {
+                processedContent = this.renderLaTeX(content);
+            }
             
             // Use the same renderer as the streaming markdown
             const renderer = default_renderer(tempContainer);
             const mdParser = parser(renderer);
             
             // Render the complete markdown content
-            parser_write(mdParser, content);
+            parser_write(mdParser, processedContent);
             parser_end(mdParser);
             
             // Apply code highlighting if available
@@ -2010,30 +2459,52 @@ export class AskView extends LitElement {
         if (!content || !element) return;
         
         try {
+            console.log('[AskView] Rendering markdown into element, content preview:', content.substring(0, 100) + '...');
+            
             // Clear the element first
             element.innerHTML = '';
             
-            // Use the same renderer as the streaming markdown
-            const renderer = default_renderer(element);
-            const mdParser = parser(renderer);
+            // Use the same rendering approach as streaming
+            // This ensures LaTeX is processed correctly
+            this.currentResponse = content; // Temporarily set for rendering
+            this.renderStreamingMarkdown(element);
+            this.currentResponse = ''; // Clear after rendering
             
-            // Render the complete markdown content
-            parser_write(mdParser, content);
-            parser_end(mdParser);
-            
-            // Apply code highlighting if available
-            if (this.hljs) {
-                element.querySelectorAll('pre code').forEach(block => {
-                    try {
-                        this.hljs.highlightElement(block);
-                    } catch (e) {
-                        console.warn('Code highlighting failed for block:', e);
-                    }
-                });
-            }
+            console.log('[AskView] Markdown rendering completed for conversation history using streaming approach');
         } catch (error) {
-            console.error('Error rendering markdown into element:', error);
-            element.textContent = content; // Fallback to plain text
+            console.error('[AskView] Error rendering markdown into element:', error);
+            
+            // Fallback to the old approach if streaming approach fails
+            try {
+                // Process LaTeX first if available
+                let processedContent = content;
+                if (this.katex) {
+                    console.log('[AskView] Fallback: Processing LaTeX for conversation history...');
+                    processedContent = this.renderLaTeX(content);
+                }
+                
+                // Use the same renderer as the streaming markdown
+                const renderer = default_renderer(element);
+                const mdParser = parser(renderer);
+                
+                // Render the complete markdown content
+                parser_write(mdParser, processedContent);
+                parser_end(mdParser);
+                
+                // Apply code highlighting if available
+                if (this.hljs) {
+                    element.querySelectorAll('pre code').forEach(block => {
+                        try {
+                            this.hljs.highlightElement(block);
+                        } catch (e) {
+                            console.warn('Code highlighting failed for block:', e);
+                        }
+                    });
+                }
+            } catch (fallbackError) {
+                console.error('[AskView] Fallback rendering also failed:', fallbackError);
+                element.textContent = content; // Last resort fallback to plain text
+            }
         }
     }
 

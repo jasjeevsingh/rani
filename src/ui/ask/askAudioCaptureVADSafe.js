@@ -42,8 +42,8 @@ class AskAudioCaptureVADSafe {
         this.onInterruption = null;
         this.onTranscriptionComplete = null;
         
-        // Initialize VAD with error handling
-        this.initializeVADSafely();
+        // DON'T initialize VAD automatically - wait for user action
+        console.log('[VAD-Safe] VAD system ready, waiting for user to activate voice input');
     }
 
     /**
@@ -264,6 +264,13 @@ class AskAudioCaptureVADSafe {
 
         try {
             console.log('🎙️ [VAD-Debug] STARTING CONVERSATION MODE');
+            
+            // Initialize VAD now if not already done (lazy initialization)
+            if (!this.vadInitialized) {
+                console.log('🔧 [VAD-Debug] VAD not initialized, initializing now...');
+                await this.initializeVADSafely();
+            }
+            
             console.log(`   └─ VAD Initialized: ${this.vadInitialized}`);
             console.log(`   └─ VAD Mode: ${this.isVADMode}`);
             console.log(`   └─ Speech Detection Active: ${this.speechDetectionActive}`);
