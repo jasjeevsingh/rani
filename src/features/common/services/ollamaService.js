@@ -226,6 +226,18 @@ class OllamaService extends EventEmitter {
         return await this.shutdown();
     }
 
+    async ensureServiceRunning() {
+        const installed = await this.isInstalled();
+        if (!installed) {
+            throw new Error('Ollama is not installed');
+        }
+
+        const running = await this.isServiceRunning();
+        if (!running) {
+            await this.startService();
+        }
+    }
+
     // Comprehensive health check using multiple endpoints
     async healthCheck() {
         try {
@@ -406,6 +418,49 @@ class OllamaService extends EventEmitter {
     async isModelInstalled(modelName) {
         const models = await this.getInstalledModels();
         return models.some(model => model.name === modelName);
+    }
+
+    async createEmbedding({ model, prompt }) {
+        if (!prompt || !prompt.trim()) {
+            throw new Error('Prompt is required to create an embedding');
+        }
+
+        const targetModel = model || 'nomic-embed-text';
+
+        await this.ensureServiceRunning();
+
+        const performRequest = async (allowInstallRetry = true) => {
+            const response = await this.makeRequest('/api/embeddings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: targetModel,
+                    prompt
+                })
+            });
+
+            if (response.status === 404 && allowInstallRetry) {
+                console.log(`[OllamaService] Embedding model ${targetModel} not found. Pulling model...`);
+                await this.pullModel(targetModel);
+                return performRequest(false);
+            }
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => response.statusText);
+                throw new Error(`Ollama embedding request failed (${response.status}): ${errorText}`);
+            }
+
+            const data = await response.json();
+            const embedding = Array.isArray(data?.embedding) ? data.embedding : data?.data;
+
+            if (!Array.isArray(embedding)) {
+                throw new Error('Unexpected embedding response format from Ollama');
+            }
+
+            return embedding;
+        };
+
+        return performRequest(true);
     }
 
     async pullModel(modelName) {

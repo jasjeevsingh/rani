@@ -1,6 +1,10 @@
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const ollamaService = require('../common/services/ollamaService');
+
+const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text';
 
 /**
  * Document Service for RANI
@@ -33,7 +37,7 @@ class DocumentService {
      * @param {string} userId - User ID
      * @returns {Promise<Object>} Document metadata
      */
-    async processDocument(filePath, originalName, userId) {
+    async processDocument(filePath, originalName, userId, additionalMetadata = {}) {
         try {
             const documentId = crypto.randomUUID();
             const fileStats = await fs.stat(filePath);
@@ -48,18 +52,24 @@ class DocumentService {
             // Extract text content based on file type
             let extractedText = '';
             let metadata = {};
+            let pageEntries = [];
             
             if (contentType === 'application/pdf') {
                 try {
                     const pdfResult = await this.extractPDFContent(storagePath);
-                    extractedText = pdfResult.text;
+                    extractedText = pdfResult.fullText;
                     metadata = pdfResult.metadata;
+                    pageEntries = pdfResult.pages || [];
                 } catch (error) {
                     console.warn('[DocumentService] PDF extraction failed, storing without text:', error.message);
                 }
             } else if (contentType.startsWith('text/')) {
                 extractedText = await fs.readFile(storagePath, 'utf-8');
             }
+
+            metadata = { ...metadata, ...additionalMetadata };
+            const embeddingModel = metadata.embeddingModel || DEFAULT_EMBEDDING_MODEL;
+            metadata.embeddingModel = embeddingModel;
 
             // Store document metadata in database
             const document = {
@@ -77,6 +87,14 @@ class DocumentService {
 
             await this.storeDocument(document);
             
+            if (pageEntries.length > 0) {
+                try {
+                    await this.savePageEmbeddings(documentId, userId, pageEntries, embeddingModel);
+                } catch (error) {
+                    console.error('[DocumentService] Failed to store page embeddings:', error);
+                }
+            }
+            
             console.log(`[DocumentService] Successfully processed document: ${originalName} (${documentId})`);
             
             return {
@@ -86,7 +104,8 @@ class DocumentService {
                 fileSize: fileStats.size,
                 uploadedAt: document.uploaded_at,
                 hasText: extractedText.length > 0,
-                metadata
+                metadata,
+                pages: pageEntries
             };
         } catch (error) {
             console.error('[DocumentService] Failed to process document:', error);
@@ -94,25 +113,26 @@ class DocumentService {
         }
     }
 
+    async importDocument(filePath, userId, metadata = {}) {
+        const originalName = path.basename(filePath);
+        return await this.processDocument(filePath, originalName, userId, metadata);
+    }
+
     /**
      * Extract text and metadata from PDF files
      */
     async extractPDFContent(filePath) {
         try {
-            const fs = require('fs');
             let pdfParse;
-            
+
             try {
                 pdfParse = require('pdf-parse');
             } catch (requireError) {
                 console.warn('[DocumentService] pdf-parse not found, using fallback text extraction');
-                return {
-                    text: `[PDF Text Content]
-Filename: ${path.basename(filePath)}
-Note: PDF text extraction requires the 'pdf-parse' library to be installed.
-Run: npm install pdf-parse
+                const fallbackText = '[PDF Text Content]\nFilename: ' + path.basename(filePath) + '\nNote: PDF text extraction requires the \'pdf-parse\' library to be installed.\nRun: npm install pdf-parse\n\nThis document contains PDF content that would be extracted and made searchable.';
 
-This document contains PDF content that would be extracted and made searchable.`,
+                return {
+                    fullText: fallbackText,
                     metadata: {
                         pages: 0,
                         title: path.basename(filePath),
@@ -120,27 +140,51 @@ This document contains PDF content that would be extracted and made searchable.`
                         subject: 'PDF content extraction not available',
                         creator: '',
                         creationDate: null
-                    }
+                    },
+                    pages: [{ pageNumber: 1, text: fallbackText }]
                 };
             }
-            
-            console.log(`[DocumentService] Extracting text from PDF: ${filePath}`);
-            
-            const dataBuffer = fs.readFileSync(filePath);
+
+            console.log('[DocumentService] Extracting text from PDF: ' + filePath);
+
+            const dataBuffer = fsSync.readFileSync(filePath);
+            const pageTexts = [];
             const data = await pdfParse(dataBuffer, {
-                // Options for pdf-parse
-                max: 0, // 0 means no limit
-                version: 'v1.10.100' // PDF version to use
+                max: 0,
+                version: 'v1.10.100',
+                pagerender: async (pageData) => {
+                    const textContent = await pageData.getTextContent();
+                    const pageText = textContent.items
+                        .map(item => item.str)
+                        .join(' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    pageTexts.push(pageText);
+                    return pageText;
+                }
             });
-            
-            // Extract and structure the content
-            const extractedText = data.text;
-            const pageCount = data.numpages;
+
+            const fallbackText = (data.text || '').trim();
+            if (pageTexts.length === 0 && fallbackText) {
+                const normalized = fallbackText
+                    .split(/\f|\n\s*\n/g)
+                    .map(segment => segment.trim())
+                    .filter(Boolean);
+
+                if (normalized.length === 0) {
+                    normalized.push(fallbackText);
+                }
+
+                normalized.forEach(text => pageTexts.push(text));
+            }
+
+            const combinedText = pageTexts.length > 0 ? pageTexts.join('\n\n') : fallbackText;
+            const pageCount = data.numpages || pageTexts.length || (combinedText ? 1 : 0);
             const pdfInfo = data.info || {};
-            
-            console.log(`[DocumentService] Successfully extracted ${extractedText.length} characters from ${pageCount} pages`);
-            
-            // Create structured metadata
+
+            console.log('[DocumentService] Successfully extracted ' + combinedText.length + ' characters from ' + pageCount + ' pages');
+
             const metadata = {
                 pages: pageCount,
                 title: pdfInfo.Title || path.basename(filePath),
@@ -151,32 +195,36 @@ This document contains PDF content that would be extracted and made searchable.`
                 keywords: pdfInfo.Keywords || '',
                 extractedAt: new Date().toISOString()
             };
-            
-            // Create structured text content with metadata header
+
             const structuredText = [
-                `[PDF Document: ${metadata.title}]`,
-                metadata.author ? `Author: ${metadata.author}` : '',
-                metadata.subject ? `Subject: ${metadata.subject}` : '',
-                `Pages: ${pageCount}`,
-                metadata.creationDate ? `Created: ${metadata.creationDate.toISOString()}` : '',
+                '[PDF Document: ' + metadata.title + ']',
+                metadata.author ? 'Author: ' + metadata.author : '',
+                metadata.subject ? 'Subject: ' + metadata.subject : '',
+                'Pages: ' + metadata.pages,
+                metadata.creationDate ? 'Created: ' + metadata.creationDate.toISOString() : '',
                 '--- Content ---',
-                extractedText
-            ].filter(line => line).join('\n\n');
-            
+                combinedText
+            ].filter(Boolean).join('\n\n');
+
+            const pages = pageTexts.length > 0
+                ? pageTexts.map((text, index) => ({
+                    pageNumber: index + 1,
+                    text
+                }))
+                : [{ pageNumber: 1, text: combinedText }];
+
             return {
-                text: structuredText,
-                metadata: metadata
+                fullText: structuredText,
+                metadata,
+                pages
             };
         } catch (error) {
             console.error('[DocumentService] Failed to extract PDF content:', error);
-            
-            // Return fallback content instead of throwing
-            return {
-                text: `[PDF Text Extraction Error]
-Filename: ${path.basename(filePath)}
-Error: ${error.message}
 
-This PDF document could not be processed for text extraction. The file may be encrypted, corrupted, or contain only images.`,
+            const fallbackText = '[PDF Text Extraction Error]\nFilename: ' + path.basename(filePath) + '\nError: ' + error.message + '\n\nThis PDF document could not be processed for text extraction. The file may be encrypted, corrupted, or contain only images.';
+
+            return {
+                fullText: fallbackText,
                 metadata: {
                     pages: 0,
                     title: path.basename(filePath),
@@ -185,7 +233,8 @@ This PDF document could not be processed for text extraction. The file may be en
                     creator: '',
                     creationDate: null,
                     error: error.message
-                }
+                },
+                pages: [{ pageNumber: 1, text: fallbackText }]
             };
         }
     }
@@ -324,6 +373,92 @@ This PDF document could not be processed for text extraction. The file may be en
             document.file_path, document.file_size, document.extracted_text,
             document.metadata, document.uploaded_at, document.sync_state
         );
+    }
+
+    async savePageEmbeddings(documentId, userId, pageEntries, embeddingModel) {
+        if (!Array.isArray(pageEntries) || pageEntries.length === 0) {
+            return;
+        }
+
+        const ready = await this.ensureOllamaEmbeddingReady(embeddingModel);
+        if (!ready) {
+            console.warn(`[DocumentService] Skipping embeddings for ${documentId} - Ollama not ready.`);
+            return;
+        }
+
+        const db = this.db.getDb();
+        db.prepare('DELETE FROM document_embeddings WHERE document_id = ?').run(documentId);
+
+        const insertStmt = db.prepare(`
+            INSERT INTO document_embeddings (
+                id, document_id, uid, page_number, page_text, embedding,
+                model, created_at, sync_state
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        const createdAt = Math.floor(Date.now() / 1000);
+        const targetModel = embeddingModel || DEFAULT_EMBEDDING_MODEL;
+
+        for (const entry of pageEntries) {
+            const pageText = (entry?.text || '').trim();
+            if (!pageText) continue;
+
+            try {
+                const embedding = await ollamaService.createEmbedding({
+                    model: targetModel,
+                    prompt: pageText
+                });
+
+                insertStmt.run(
+                    crypto.randomUUID(),
+                    documentId,
+                    userId,
+                    entry?.pageNumber || 0,
+                    pageText,
+                    JSON.stringify(embedding),
+                    targetModel,
+                    createdAt,
+                    'clean'
+                );
+            } catch (error) {
+                console.error(`[DocumentService] Failed to embed page ${entry?.pageNumber} for document ${documentId}: ${error.message || error}`);
+            }
+        }
+    }
+
+    async ensureOllamaEmbeddingReady(modelName) {
+        const targetModel = modelName || DEFAULT_EMBEDDING_MODEL;
+
+        try {
+            const isInstalled = await ollamaService.isInstalled();
+            if (!isInstalled) {
+                console.warn('[DocumentService] Ollama is not installed. Embeddings will be skipped.');
+                return false;
+            }
+
+            const running = await ollamaService.isServiceRunning();
+            if (!running) {
+                try {
+                    await ollamaService.startService();
+                } catch (error) {
+                    console.error('[DocumentService] Failed to start Ollama service:', error);
+                    return false;
+                }
+            }
+
+            if (typeof ollamaService.isModelInstalled === 'function') {
+                const installed = await ollamaService.isModelInstalled(targetModel);
+                if (!installed) {
+                    console.log(`[DocumentService] Pulling embedding model ${targetModel}...`);
+                    await ollamaService.pullModel(targetModel);
+                }
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[DocumentService] Failed to prepare Ollama embeddings:', error);
+            return false;
+        }
     }
 
     /**

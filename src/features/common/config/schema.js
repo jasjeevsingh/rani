@@ -145,6 +145,20 @@ const LATEST_SCHEMA = {
             { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
         ]
     },
+    document_embeddings: {
+        columns: [
+            { name: 'id', type: 'TEXT PRIMARY KEY' },
+            { name: 'document_id', type: 'TEXT NOT NULL' },
+            { name: 'uid', type: 'TEXT NOT NULL' },
+            { name: 'page_number', type: 'INTEGER NOT NULL' },
+            { name: 'page_text', type: 'TEXT' },
+            { name: 'embedding', type: 'TEXT' },
+            { name: 'model', type: 'TEXT' },
+            { name: 'created_at', type: 'INTEGER' },
+            { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
+        ],
+        constraints: ['UNIQUE(document_id, page_number)']
+    },
     research_papers: {
         columns: [
             { name: 'id', type: 'TEXT PRIMARY KEY' },
