@@ -1,4 +1,46 @@
 const { BrowserWindow, globalShortcut, screen, app, shell } = require('electron');
+// --- SIDEBAR WINDOW CREATION ---
+let sidebarWindow = null;
+
+function createSidebarWindow() {
+    if (sidebarWindow && !sidebarWindow.isDestroyed()) {
+        return sidebarWindow;
+    }
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight, x: screenX, y: screenY } = primaryDisplay.workArea;
+    const SIDEBAR_WIDTH = 380;
+    sidebarWindow = new BrowserWindow({
+        width: SIDEBAR_WIDTH,
+        height: screenHeight,
+        x: screenX + screenWidth - SIDEBAR_WIDTH,
+        y: screenY,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        resizable: true,
+        hasShadow: false,
+        skipTaskbar: true,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, '../preload.js'),
+            backgroundThrottling: false,
+            webSecurity: false,
+            enableRemoteModule: false,
+        },
+    });
+    sidebarWindow.setContentProtection(isContentProtectionOn);
+    sidebarWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    sidebarWindow.loadFile(path.join(__dirname, '../ui/app/sidebar.html'));
+    // Open DevTools in development
+    if (!app.isPackaged) {
+        sidebarWindow.webContents.openDevTools({ mode: 'detach' });
+    }
+    sidebarWindow.on('closed', () => {
+        sidebarWindow = null;
+    });
+    return sidebarWindow;
+}
 const WindowLayoutManager = require('./windowLayoutManager');
 const SmoothMovementManager = require('./smoothMovementManager');
 const path = require('node:path');
@@ -161,19 +203,23 @@ function setupWindowController(windowPool, layoutManager, movementManager) {
 
     internalBridge.on('window:resizeHeaderWindow', ({ width, height }) => {
         const header = windowPool.get('header');
-        if (!header || movementManager.isAnimating) return;
-
-        const newHeaderBounds = layoutManager.calculateHeaderResize(header, { width, height });
+        if (!header) return;
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width: screenWidth, height: screenHeight, x: screenX, y: screenY } = primaryDisplay.workArea;
+        const SIDEBAR_WIDTH = 380;
+        console.log('[resizeHeaderWindow] Requested:', { width, height }, 'PrimaryDisplay workArea:', { screenWidth, screenHeight, screenX, screenY });
         
-        const wasResizable = header.isResizable();
-        if (!wasResizable) header.setResizable(true);
-
-        movementManager.animateWindowBounds(header, newHeaderBounds, {
-            onComplete: () => {
-                if (!wasResizable) header.setResizable(false);
-                updateChildWindowLayouts(true);
-            }
+        // Keep background transparent regardless of size
+        header.setBackgroundColor('#00000000');
+        header.setOpacity(1);
+        
+        header.setBounds({
+            x: screenX + screenWidth - SIDEBAR_WIDTH,
+            y: screenY,
+            width: SIDEBAR_WIDTH,
+            height: height // Use requested height
         });
+        updateChildWindowLayouts(true);
     });
     internalBridge.on('window:headerAnimationFinished', (state) => {
         const header = windowPool.get('header');
@@ -216,6 +262,17 @@ function setupWindowController(windowPool, layoutManager, movementManager) {
                 }
             });
         }
+    });
+    
+    internalBridge.on('window:setSidebarCollapsed', ({ isCollapsed }) => {
+        const header = windowPool.get('header');
+        if (!header) return;
+        
+        console.log('[setSidebarCollapsed] isCollapsed:', isCollapsed);
+        
+        // Keep background transparent for both open and closed states
+        console.log('[setSidebarCollapsed] Keeping background transparent');
+        header.setBackgroundColor('#00000000');
     });
 }
 
@@ -478,7 +535,7 @@ function createFeatureWindows(header, namesToCreate) {
         show: false,
         frame: false,
         transparent: true,
-        vibrancy: false,
+        backgroundColor: '#00000000',
         hasShadow: false,
         skipTaskbar: true,
         hiddenInMissionControl: true,
@@ -709,28 +766,30 @@ function getCurrentDisplay(window) {
 
 
 function createWindows() {
-    const HEADER_HEIGHT        = 47;
-    const DEFAULT_WINDOW_WIDTH = 353;
 
+    // const primaryDisplay = screen.getPrimaryDisplay();
+    // const { y: workAreaY, width: screenWidth } = primaryDisplay.workArea;
+
+    const SIDEBAR_WIDTH = 380;
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { y: workAreaY, width: screenWidth } = primaryDisplay.workArea;
+    const { width: screenWidth, height: screenHeight, x: screenX, y: screenY } = primaryDisplay.workArea;
 
-    const initialX = Math.round((screenWidth - DEFAULT_WINDOW_WIDTH) / 2);
-    const initialY = workAreaY + 21;
-        
+    // If you need initialX/initialY for other windows, define them after screenWidth is set
+    // const initialX = Math.round((screenWidth - DEFAULT_WINDOW_WIDTH) / 2);
+    // const initialY = workAreaY + 21;
     const header = new BrowserWindow({
-        width: DEFAULT_WINDOW_WIDTH,
-        height: HEADER_HEIGHT,
-        x: initialX,
-        y: initialY,
+        width: SIDEBAR_WIDTH,
+        height: screenHeight,
+        x: screenX + screenWidth - SIDEBAR_WIDTH,
+        y: screenY,
         frame: false,
         transparent: true,
-        vibrancy: false,
+        backgroundColor: '#00000000',
         hasShadow: false,
         alwaysOnTop: true,
         skipTaskbar: true,
         hiddenInMissionControl: true,
-        resizable: false,
+        resizable: true,
         focusable: true,
         acceptFirstMouse: true,
         webPreferences: {
@@ -740,10 +799,8 @@ function createWindows() {
             backgroundThrottling: false,
             webSecurity: false,
             enableRemoteModule: false,
-            // Ensure proper rendering and prevent pixelation
             experimentalFeatures: false,
         },
-        // Prevent pixelation and ensure proper rendering
         useContentSize: true,
         disableAutoHideCursor: true,
     });
@@ -769,6 +826,9 @@ function createWindows() {
     windowPool.set('header', header);
     layoutManager = new WindowLayoutManager(windowPool);
     movementManager = new SmoothMovementManager(windowPool);
+
+    // Set initial transparent background
+    header.setBackgroundColor('#00000000');
 
 
     header.on('moved', () => {
@@ -871,6 +931,8 @@ async function toggleResearchView() {
 
 
 module.exports = {
+    createSidebarWindow,
+    // ...existing code...
     createWindows,
     windowPool,
     toggleContentProtection,

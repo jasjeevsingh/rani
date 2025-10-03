@@ -9,7 +9,6 @@ module.exports = {
     
     // 기존 IPC 핸들러들
     ipcMain.handle('toggle-content-protection', () => windowManager.toggleContentProtection());
-    ipcMain.handle('resize-header-window', (event, args) => windowManager.resizeHeaderWindow(args));
     ipcMain.handle('get-content-protection-status', () => windowManager.getContentProtectionStatus());
     ipcMain.on('show-settings-window', () => windowManager.showSettingsWindow());
     ipcMain.on('hide-settings-window', () => windowManager.hideSettingsWindow());
@@ -26,6 +25,22 @@ module.exports = {
     ipcMain.handle('get-header-position', () => windowManager.getHeaderPosition());
     ipcMain.handle('move-header-to', (event, newX, newY) => windowManager.moveHeaderTo(newX, newY));
     ipcMain.handle('adjust-window-height', (event, { winName, height }) => windowManager.adjustWindowHeight(winName, height));
+    
+    const { screen } = require('electron');
+    ipcMain.handle('get-work-area-height', () => {
+      return screen.getPrimaryDisplay().workArea.height;
+    });
+
+    // New handlers for sidebar collapse
+    ipcMain.handle('resize-header-window', (event, { width, height }) => {
+      return windowManager.resizeHeaderWindow({ width, height });
+    });
+    
+    ipcMain.handle('set-sidebar-collapsed', (event, { isCollapsed }) => {
+      const internalBridge = require('../bridge/internalBridge');
+      internalBridge.emit('window:setSidebarCollapsed', { isCollapsed });
+      return Promise.resolve();
+    });
   },
 
   async toggleResearchView() {

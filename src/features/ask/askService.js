@@ -370,7 +370,7 @@ class AskService {
 
             const conversationHistory = this._formatConversationForPrompt(conversationHistoryRaw);
 
-            const systemPrompt = getSystemPrompt('rani_analysis', conversationHistory);
+            const systemPrompt = getSystemPrompt('rani_main', conversationHistory);
 
             const messages = [
                 { role: 'system', content: systemPrompt },

@@ -2,6 +2,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  getWorkAreaHeight: async () => await ipcRenderer.invoke('get-work-area-height'),
   // Platform information for renderer processes
   platform: {
     isLinux: process.platform === 'linux',
@@ -86,6 +87,7 @@ contextBridge.exposeInMainWorld('api', {
     
     // Window Management
     resizeHeaderWindow: (dimensions) => ipcRenderer.invoke('resize-header-window', dimensions),
+    setSidebarCollapsed: (isCollapsed) => ipcRenderer.invoke('set-sidebar-collapsed', { isCollapsed }),
     
     // Permissions
     checkSystemPermissions: () => ipcRenderer.invoke('check-system-permissions'),

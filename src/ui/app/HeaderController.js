@@ -16,7 +16,7 @@ class HeaderTransitionManager {
          * only one header window is allowed
          * @param {'welcome'|'apikey'|'main'|'permission'} type
          */
-        this.ensureHeader = (type) => {
+    this.ensureHeader = (type) => {
             console.log('[HeaderController] ensureHeader: Ensuring header of type:', type);
             if (this.currentHeaderType === type) {
                 console.log('[HeaderController] ensureHeader: Header of type:', type, 'already exists.');
@@ -59,11 +59,22 @@ class HeaderTransitionManager {
                     this.transitionToMainHeader();
                 };
                 this.headerContainer.appendChild(this.permissionHeader);
+
+            } else if (type === 'settings') {
+                this.settingsView = document.createElement('settings-view');
+                this.settingsView.addEventListener('close-settings', () => {
+                    this.transitionToMainHeader();
+                });
+                this.headerContainer.appendChild(this.settingsView);
             } else {
                 this.mainHeader = document.createElement('main-header');
+                this.mainHeader.addEventListener('open-settings', () => {
+                    this.transitionToSettingsView();
+                });
                 this.headerContainer.appendChild(this.mainHeader);
                 this.mainHeader.startSlideInAnimation?.();
             }
+
 
             this.currentHeaderType = type;
             this.notifyHeaderState(type === 'permission' ? 'apikey' : type); // Keep permission state as apikey for compatibility
@@ -227,9 +238,12 @@ class HeaderTransitionManager {
     }
 
     async _resizeForMain() {
-        if (!window.api) return;
-        console.log('[HeaderController] _resizeForMain: Resizing window to 420x47');
-        return window.api.headerController.resizeHeaderWindow({ width: 430, height: 47 }).catch(() => {});
+    if (!window.api) return;
+    // Use full sidebar height (e.g., 800px or window.screen.availHeight)
+    const sidebarWidth = 430;
+    const sidebarHeight = window.screen?.availHeight || 800;
+    console.log(`[HeaderController] _resizeForMain: Resizing window to ${sidebarWidth}x${sidebarHeight}`);
+    return window.api.headerController.resizeHeaderWindow({ width: sidebarWidth, height: sidebarHeight }).catch(() => {});
     }
 
     async _resizeForApiKey(height = 370) {
