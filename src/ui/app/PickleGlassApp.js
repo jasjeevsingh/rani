@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../assets/lit-core-2.7.4.min.js';
+import './globals.css';
 import { SettingsView } from '../settings/SettingsView.js';
 import { ListenView } from '../listen/ListenView.js';
 import { AskView } from '../ask/AskView.js';
@@ -14,8 +15,22 @@ export class RaniApp extends LitElement {
             width: 100%;
             height: 100%;
             color: var(--text-color);
-            background: transparent;
+            background: transparent !important;
             border-radius: 7px;
+        }
+
+        .glass-effect {
+            background: rgba(255,255,255,0.08) !important;
+            backdrop-filter: blur(32px) saturate(250%) brightness(1.15);
+            -webkit-backdrop-filter: blur(32px) saturate(250%) brightness(1.15);
+            border-radius: 16px;
+            box-shadow: 0 8px 48px rgba(0,0,0,0.18);
+            border: 2px solid #00ffff;
+            transition: backdrop-filter 0.2s, background 0.2s;
+        }
+
+        .glass-effect > * {
+            background: none !important;
         }
 
         listen-view {
@@ -29,7 +44,6 @@ export class RaniApp extends LitElement {
             width: 100%;
             height: 100%;
         }
-
     `;
 
     static properties = {
@@ -272,9 +286,11 @@ export class RaniApp extends LitElement {
 
 
     render() {
+        const isSimulatedGlass = !(window.api && window.api.isNativeGlassSupported && window.api.isNativeGlassSupported());
+        let view;
         switch (this.currentView) {
             case 'research':
-                return html`<research-view
+                view = html`<research-view
                     @search-papers=${this.handleSearchPapers}
                     @import-paper=${this.handleImportPaper}
                     @upload-document=${this.handleUploadDocument}
@@ -283,33 +299,46 @@ export class RaniApp extends LitElement {
                     @document-selected=${this.handleDocumentSelected}
                     @open-document=${this.handleOpenDocument}
                 ></research-view>`;
+                break;
             case 'listen':
-                return html`<listen-view
+                view = html`<listen-view
                     .currentResponseIndex=${this.currentResponseIndex}
                     .selectedProfile=${this.selectedProfile}
                     .structuredData=${this.structuredData}
                     @response-index-changed=${e => (this.currentResponseIndex = e.detail.index)}
                 ></listen-view>`;
+                break;
             case 'ask':
-                return html`<ask-view></ask-view>`;
+                view = html`<ask-view></ask-view>`;
+                break;
             case 'settings':
-                return html`<settings-view
+                view = html`<settings-view
                     .selectedProfile=${this.selectedProfile}
                     .selectedLanguage=${this.selectedLanguage}
                     .onProfileChange=${profile => (this.selectedProfile = profile)}
                     .onLanguageChange=${lang => (this.selectedLanguage = lang)}
                 ></settings-view>`;
+                break;
             case 'shortcut-settings':
-                return html`<shortcut-settings-view></shortcut-settings-view>`;
+                view = html`<shortcut-settings-view></shortcut-settings-view>`;
+                break;
             case 'history':
-                return html`<history-view></history-view>`;
+                view = html`<history-view></history-view>`;
+                break;
             case 'help':
-                return html`<help-view></help-view>`;
+                view = html`<help-view></help-view>`;
+                break;
             case 'setup':
-                return html`<setup-view></setup-view>`;
+                view = html`<setup-view></setup-view>`;
+                break;
             default:
-                return html`<div>Unknown view: ${this.currentView}</div>`;
+                view = html`<div>Unknown view: ${this.currentView}</div>`;
         }
+        return html`
+            <div class="${isSimulatedGlass ? 'glass-effect' : ''}">
+                ${view}
+            </div>
+        `;
     }
 }
 

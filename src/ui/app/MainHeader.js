@@ -166,7 +166,7 @@ export class MainHeader extends LitElement {
                 position: absolute;
                 inset: 0;
                 background: url('../assets/starrynight.jpg') center center / cover no-repeat;
-                opacity: 0.7;
+                opacity: 1;
                 pointer-events: none;
                 border-radius: inherit;
                 z-index: 0;
@@ -293,7 +293,17 @@ export class MainHeader extends LitElement {
                     });
                 }
             }
-            // When closing, do not resize window. Sidebar will slide closed and become invisible except for expand button.
+            // When closing, resize Electron window after animation completes
+            if (!this.sidebarOpen) {
+                setTimeout(() => {
+                    if (window.api && window.api.headerController && window.api.headerController.resizeHeaderWindow) {
+                        window.api.getWorkAreaHeight().then(height => {
+                            console.log('[MainHeader] Resizing window for closed sidebar:', { width: 81, height: 90 });
+                            window.api.headerController.resizeHeaderWindow({ width: 81, height: 90 });
+                        });
+                    }
+                }, 400); // Match CSS transition duration
+            }
         });
     }
 

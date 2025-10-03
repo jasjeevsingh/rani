@@ -208,17 +208,21 @@ function setupWindowController(windowPool, layoutManager, movementManager) {
         const { width: screenWidth, height: screenHeight, x: screenX, y: screenY } = primaryDisplay.workArea;
         const SIDEBAR_WIDTH = 380;
         console.log('[resizeHeaderWindow] Requested:', { width, height }, 'PrimaryDisplay workArea:', { screenWidth, screenHeight, screenX, screenY });
-        
+        // Debug: log before resizing
+        console.log('[WindowManager] resizeHeaderWindow received:', width, height);
         // Keep background transparent regardless of size
         header.setBackgroundColor('#00000000');
         header.setOpacity(1);
-        
         header.setBounds({
-            x: screenX + screenWidth - SIDEBAR_WIDTH,
-            y: screenY,
-            width: SIDEBAR_WIDTH,
+            x: screenX + screenWidth - width,
+            y: screenY + Math.round((screenHeight - height) / 2),
+            width: width,
             height: height // Use requested height
         });
+        // Debug: log after resizing
+        console.log('[WindowManager] headerWindow bounds after resize:', header.getBounds());
+        // Debug: log background color
+        console.log('[WindowManager] headerWindow background color:', header.getBackgroundColor());
         updateChildWindowLayouts(true);
     });
     internalBridge.on('window:headerAnimationFinished', (state) => {
