@@ -35,7 +35,6 @@
     "dependencies": {
         "@anthropic-ai/sdk": "^0.56.0",
         "@deepgram/sdk": "^4.9.1",
-        "@esbuild/darwin-x64": "^0.25.9",
         "@google/genai": "^1.8.0",
         "@google/generative-ai": "^0.24.1",
         "@ricky0123/vad-web": "^0.0.27",
