@@ -251,6 +251,8 @@ contextBridge.exposeInMainWorld('api', {
     // Ollama Management
     getOllamaStatus: () => ipcRenderer.invoke('ollama:get-status'),
     ensureOllamaReady: () => ipcRenderer.invoke('ollama:ensure-ready'),
+    installOllama: () => ipcRenderer.invoke('localai:install', { service: 'ollama' }),
+    startOllamaService: () => ipcRenderer.invoke('localai:start-service', 'ollama'),
     shutdownOllama: (graceful) => ipcRenderer.invoke('ollama:shutdown', graceful),
     
     // Whisper Management

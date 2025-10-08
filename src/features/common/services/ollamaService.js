@@ -1173,15 +1173,7 @@ class OllamaService extends EventEmitter {
 
     async shutdownMacOS(force) {
         try {
-            // 1. First, try to kill ollama server process
-            console.log('[OllamaService] Killing ollama server process...');
-            try {
-                await spawnAsync('pkill', ['-f', 'ollama serve']);
-            } catch (e) {
-                // Process might not be running
-            }
-            
-            // 2. Then quit the Ollama.app
+            // 1. First quit the Ollama.app to prevent auto-restart
             console.log('[OllamaService] Quitting Ollama.app...');
             try {
                 await spawnAsync('osascript', ['-e', 'tell application "Ollama" to quit']);
@@ -1189,7 +1181,18 @@ class OllamaService extends EventEmitter {
                 console.log('[OllamaService] Ollama.app might not be running');
             }
             
-            // 3. Wait a moment for shutdown
+            // 2. Wait for app to quit
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 3. Then kill ollama server process
+            console.log('[OllamaService] Killing ollama server process...');
+            try {
+                await spawnAsync('pkill', ['-f', 'ollama serve']);
+            } catch (e) {
+                // Process might not be running
+            }
+            
+            // 4. Wait a moment for shutdown
             await new Promise(resolve => setTimeout(resolve, 2000));
             
             // 4. Force kill any remaining ollama processes

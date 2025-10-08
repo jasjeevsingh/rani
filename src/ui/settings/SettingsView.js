@@ -476,6 +476,73 @@ export class SettingsView extends LitElement {
         :host-context(body.has-glass) .settings-container::before {
             display: none !important;
         }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(8px);
+        }
+        
+        .modal-content {
+            background: rgba(30, 30, 30, 0.95);
+            border-radius: 16px;
+            padding: 32px 24px 24px 24px;
+            max-width: 320px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .modal-icon {
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            margin: 0 0 12px 0;
+        }
+        
+        .modal-message {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            margin: 0 0 24px 0;
+            line-height: 1.5;
+        }
+        
+        .modal-button {
+            background: rgba(60, 120, 255, 0.9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 32px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        
+        .modal-button:hover {
+            background: rgba(80, 140, 255, 1);
+            transform: translateY(-1px);
+        }
+        
+        .modal-button:active {
+            transform: translateY(0);
+        }
     `;
 
 
@@ -534,6 +601,8 @@ export class SettingsView extends LitElement {
         // Whisper related
         this.whisperModels = [];
         this.whisperProgressTracker = null; // Will be initialized when needed
+        // Modal for success messages
+        this.modalMessage = { show: false, title: '', message: '' };
         this.handleUsePicklesKey = this.handleUsePicklesKey.bind(this)
         this.autoUpdateEnabled = true;
         this.autoUpdateLoading = true;
@@ -652,31 +721,53 @@ export class SettingsView extends LitElement {
 
 
     async handleSaveKey(provider) {
-        const input = this.shadowRoot.querySelector(`#key-input-${provider}`);
-        if (!input) return;
-        const key = input.value;
-        
-        // For Ollama, we need to ensure it's ready first
+        // For Ollama, we need to ensure it's installed and ready first
         if (provider === 'ollama') {
-        this.saving = true;
+            this.saving = true;
             
-            // First ensure Ollama is installed and running
-            const ensureResult = await window.api.settingsView.ensureOllamaReady();
-            if (!ensureResult.success) {
-                alert(`Failed to setup Ollama: ${ensureResult.error}`);
-                this.saving = false;
-                return;
+            try {
+                // Check current status
+                const statusResult = await window.api.settingsView.getOllamaStatus();
+                
+                if (!statusResult.installed) {
+                    // Need to install Ollama first
+                    console.log('[SettingsView] Installing Ollama...');
+                    const installResult = await window.api.settingsView.installOllama();
+                    
+                    if (!installResult.success) {
+                        alert(`Failed to install Ollama: ${installResult.error || 'Unknown error'}`);
+                        this.saving = false;
+                        return;
+                    }
+                    
+                    console.log('[SettingsView] Ollama installed successfully');
+                } else if (!statusResult.running) {
+                    // Ollama is installed but not running, start it
+                    console.log('[SettingsView] Starting Ollama service...');
+                    const startResult = await window.api.settingsView.startOllamaService();
+                    
+                    if (!startResult.success) {
+                        alert(`Failed to start Ollama: ${startResult.error || 'Unknown error'}`);
+                        this.saving = false;
+                        return;
+                    }
+                }
+                
+                // Now validate (which will check if service is running)
+                const result = await window.api.settingsView.validateKey({ provider, key: 'local' });
+                
+                if (result.success) {
+                    await this.refreshModelData();
+                    await this.refreshOllamaStatus();
+                    this.showSuccessModal('Ollama is now ready!', 'You can now select and install models.');
+                } else {
+                    alert(`Failed to connect to Ollama: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('[SettingsView] Error setting up Ollama:', error);
+                alert(`Error setting up Ollama: ${error.message}`);
             }
             
-            // Now validate (which will check if service is running)
-            const result = await window.api.settingsView.validateKey({ provider, key: 'local' });
-            
-            if (result.success) {
-                await this.refreshModelData();
-                await this.refreshOllamaStatus();
-            } else {
-                alert(`Failed to connect to Ollama: ${result.error}`);
-            }
             this.saving = false;
             return;
         }
@@ -696,6 +787,10 @@ export class SettingsView extends LitElement {
         }
         
         // For other providers, use the normal flow
+        const input = this.shadowRoot.querySelector(`#key-input-${provider}`);
+        if (!input) return;
+        const key = input.value;
+        
         this.saving = true;
         const result = await window.api.settingsView.validateKey({ provider, key });
         
@@ -1148,6 +1243,16 @@ export class SettingsView extends LitElement {
         window.api.settingsView.firebaseLogout();
     }
 
+    showSuccessModal(title, message) {
+        this.modalMessage = { show: true, title, message };
+        this.requestUpdate();
+    }
+    
+    closeModal() {
+        this.modalMessage = { show: false, title: '', message: '' };
+        this.requestUpdate();
+    }
+    
     async handleOllamaShutdown() {
         console.log('[SettingsView] Shutting down Ollama service...');
         
@@ -1162,6 +1267,9 @@ export class SettingsView extends LitElement {
             
             if (result.success) {
                 console.log('[SettingsView] Ollama shut down successfully');
+                // Wait a moment for the service to fully stop before checking status
+                // (Ollama.app needs time to quit on macOS)
+                await new Promise(resolve => setTimeout(resolve, 3000));
                 // Refresh status to reflect the change
                 await this.refreshOllamaStatus();
             } else {
@@ -1174,6 +1282,16 @@ export class SettingsView extends LitElement {
             // Restore previous state on error
             await this.refreshOllamaStatus();
         }
+    }
+    
+    showSuccessModal(title, message) {
+        this.modalMessage = { show: true, title, message };
+        this.requestUpdate();
+    }
+    
+    closeModal() {
+        this.modalMessage = { show: false, title: '', message: '' };
+        this.requestUpdate();
     }
 
     //////// after_modelStateService ////////
@@ -1455,6 +1573,23 @@ export class SettingsView extends LitElement {
                         </button>
                     </div>
                 </div>
+                
+                <!-- Success Modal -->
+                ${this.modalMessage.show ? html`
+                    <div class="modal-overlay" @click=${this.closeModal}>
+                        <div class="modal-content" @click=${(e) => e.stopPropagation()}>
+                            <div class="modal-icon">
+                                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                    <circle cx="24" cy="24" r="20" fill="rgba(0, 200, 100, 0.2)" stroke="rgba(0, 255, 100, 0.6)" stroke-width="2"/>
+                                    <path d="M16 24L21 29L32 18" stroke="rgba(0, 255, 100, 0.9)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <h2 class="modal-title">${this.modalMessage.title}</h2>
+                            <p class="modal-message">${this.modalMessage.message}</p>
+                            <button class="modal-button" @click=${this.closeModal}>OK</button>
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
     }
