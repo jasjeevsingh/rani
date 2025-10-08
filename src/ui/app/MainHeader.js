@@ -130,6 +130,7 @@ export class MainHeader extends LitElement {
                 width: 20px;
                 height: 20px;
                 fill: white;
+                color: white;
                 transition: all 0.2s ease;
                 position: relative;
                 z-index: 2;

@@ -77,6 +77,7 @@ let currentHeaderState = 'apikey';
 const windowPool = new Map();
 
 let settingsHideTimer = null;
+let settingsShowPending = false;
 
 
 let layoutManager = null;
@@ -356,21 +357,41 @@ async function handleWindowVisibilityRequest(windowPool, layoutManager, movement
 
     if (name === 'settings') {
         if (shouldBeVisible) {
+            // Prevent rapid toggling
+            if (settingsShowPending) {
+                console.log('[WindowManager] Settings show already pending, skipping...');
+                return;
+            }
+            
             // Cancel any pending hide operations
             if (settingsHideTimer) {
                 clearTimeout(settingsHideTimer);
                 settingsHideTimer = null;
             }
-            const position = layoutManager.calculateSettingsWindowPosition();
-            if (position) {
-                win.setBounds(position);
-                win.__lockedByButton = true;
-                win.show();
-                win.moveTop();
-                win.setAlwaysOnTop(true);
-            } else {
-                console.warn('[WindowManager] Could not calculate settings window position.');
-            }
+            
+            settingsShowPending = true;
+            
+            // Small delay to ensure header bounds are current after any resize
+            setTimeout(() => {
+                settingsShowPending = false;
+                const position = layoutManager.calculateSettingsWindowPosition();
+                if (position) {
+                    console.log('[WindowManager] Setting settings window bounds to:', position);
+                    win.setBounds(position);
+                    win.__lockedByButton = true;
+                    // Ensure settings appears on top with highest priority
+                    if (process.platform === 'darwin') {
+                        win.setAlwaysOnTop(true, 'floating', 1);
+                    } else {
+                        win.setAlwaysOnTop(true);
+                    }
+                    win.show();
+                    win.focus(); // Explicitly focus the window
+                    win.moveTop(); // Move to top of window stack
+                } else {
+                    console.warn('[WindowManager] Could not calculate settings window position.');
+                }
+            }, 50); // Small delay to ensure header is in final position
         } else {
             // Hide after a delay
             if (settingsHideTimer) {
@@ -625,7 +646,13 @@ function createFeatureWindows(header, namesToCreate) {
 
             // settings
             case 'settings': {
-                const settings = new BrowserWindow({ ...commonChildOptions, width:240, maxHeight:400, parent:undefined });
+                const settings = new BrowserWindow({ 
+                    ...commonChildOptions, 
+                    width:240, 
+                    maxHeight:400, 
+                    parent:undefined, // No parent to avoid z-index conflicts
+                    alwaysOnTop: false // Will be set dynamically when shown
+                });
                 settings.setContentProtection(isContentProtectionOn);
                 settings.setVisibleOnAllWorkspaces(true,{visibleOnFullScreen:true});
                 if (process.platform === 'darwin') {

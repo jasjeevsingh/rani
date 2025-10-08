@@ -81,14 +81,28 @@ class WindowLayoutManager {
         const display = getCurrentDisplay(header);
         const { x: workAreaX, y: workAreaY, width: screenWidth, height: screenHeight } = display.workArea;
 
-        const PAD = 5;
-        const buttonPadding = 170;
+        const PAD = 8;
+        
+        // Settings button is at the top-right of the header
+        // Position settings window directly below the header top (not bottom)
+        const buttonGap = 18; // Gap from right edge of header to align with button
+        
+        // Align right edge of settings window with settings button
+        const x = headerBounds.x + headerBounds.width - settingsBounds.width - buttonGap;
+        // Position at the top of the header (below the header bar)
+        const y = headerBounds.y + 54 + PAD; // 54px is the header bar height
 
-        const x = headerBounds.x + headerBounds.width - settingsBounds.width + buttonPadding;
-        const y = headerBounds.y + headerBounds.height + PAD;
-
+        // Clamp to screen bounds
         const clampedX = Math.max(workAreaX + 10, Math.min(workAreaX + screenWidth - settingsBounds.width - 10, x));
         const clampedY = Math.max(workAreaY + 10, Math.min(workAreaY + screenHeight - settingsBounds.height - 10, y));
+
+        console.log('[LayoutManager] Settings window position:', { 
+            headerBounds, 
+            settingsBounds, 
+            buttonGap,
+            calculated: { x, y }, 
+            clamped: { x: clampedX, y: clampedY } 
+        });
 
         return { x: Math.round(clampedX), y: Math.round(clampedY) };
     }

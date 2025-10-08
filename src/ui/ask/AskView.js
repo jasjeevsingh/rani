@@ -51,6 +51,7 @@ export class AskView extends LitElement {
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            position: relative; /* Establish positioning context */
         }
 
         :host([embedded]) .ask-container::before {
@@ -71,12 +72,13 @@ export class AskView extends LitElement {
         :host([embedded]) .conversation-container {
             /* Adjust container for sidebar - fill available space */
             max-height: none;
-            flex: 1 1 auto;
-            min-height: 0;
+            flex: 1 1 0; /* Allow shrinking to 0 to respect flex constraints */
+            min-height: 0; /* Critical: allow flex container to shrink below content size */
             /* Ensure proper scrolling stays within bounds */
-            overflow-y: auto;
+            overflow-y: auto !important; /* Force scrolling */
             overflow-x: hidden;
             padding: 12px 16px;
+            position: relative; /* Create stacking context */
         }
 
         :host([embedded]) .text-input-container {
@@ -84,7 +86,10 @@ export class AskView extends LitElement {
             background: rgba(0, 0, 0, 0.4);
             padding: 12px 16px;
             border-top: 1px solid rgba(255, 255, 255, 0.08);
-            flex: 0 0 auto;
+            flex: 0 0 auto; /* Never shrink, never grow - stay fixed size */
+            flex-shrink: 0; /* Explicitly prevent shrinking */
+            position: relative;
+            z-index: 2; /* Ensure input stays above content */
         }
 
         :host([embedded]) #textInput {
@@ -905,13 +910,14 @@ export class AskView extends LitElement {
 
         /* Conversation History Styles */
         .conversation-container {
-            flex: 1 1 auto;
+            flex: 1 1 0; /* Grow to fill space, shrink to 0 if needed */
             overflow-y: auto;
             overflow-x: hidden;
             padding: 16px;
             background: transparent;
             min-height: 0; /* Allow flexbox to shrink this */
-            max-height: 600px; /* Conservative max height in standalone mode */
+            /* Removed max-height to let flex handle sizing */
+            position: relative;
         }
 
         .conversation-container::-webkit-scrollbar {
