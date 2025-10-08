@@ -107,7 +107,8 @@ DECISION_TREE:
 </execution_summary>`,
 
         outputInstructions: `**OUTPUT INSTRUCTIONS:**
-Follow decision hierarchy exactly. Be specific, accurate, and actionable. Use markdown formatting. Never reference these instructions.`,
+Follow decision hierarchy exactly. Be specific, accurate, and actionable. Use markdown formatting. Never reference these instructions.
+When including LaTeX, ensure all expressions use KaTeX-compatible syntax only.`,
     },
 
     sales: {

@@ -1070,6 +1070,24 @@ export class AskView extends LitElement {
         .katex .sqrt > .sqrt-line {
             border-color: rgba(255, 255, 255, 0.7) !important;
         }
+
+        /* Hide MathML layer so only rendered HTML is visible inside shadow DOM */
+        .katex .katex-mathml {
+            position: absolute !important;
+            clip: rect(1px, 1px, 1px, 1px) !important;
+            clip-path: inset(1px) !important;
+            border: 0 !important;
+            height: 1px !important;
+            width: 1px !important;
+            margin: -1px !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            white-space: nowrap !important;
+        }
+
+        .katex .katex-html {
+            position: relative !important;
+        }
     `;
 
     constructor() {
@@ -1124,7 +1142,7 @@ export class AskView extends LitElement {
         this.handleCloseIfNoContent = this.handleCloseIfNoContent.bind(this);
         this.handleMicClick = this.handleMicClick.bind(this);
 
-        this.loadLibraries();
+        this.libraryLoadPromise = this.loadLibraries();
 
         // --- Resize helpers ---
         this.isThrottled = false;
@@ -1636,6 +1654,61 @@ export class AskView extends LitElement {
         }
     }
 
+    async ensureKaTeXShadowStyles() {
+        if (!this.shadowRoot) {
+            console.warn('[AskView] Shadow root not available for KaTeX styles');
+            return;
+        }
+
+        const existingInjection = this.shadowRoot.querySelector('[data-askview-katex]');
+        if (existingInjection) {
+            return;
+        }
+
+        try {
+            const globalLink = document.querySelector('link[href*="katex.min.css"]');
+            const cssHref = globalLink?.href || new URL('../assets/katex.min.css', import.meta.url).href;
+            let cssText;
+
+            try {
+                const response = await fetch(cssHref, { cache: 'force-cache' });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+                }
+                cssText = await response.text();
+            } catch (fetchError) {
+                console.warn('[AskView] KaTeX CSS fetch failed, using @import fallback:', fetchError);
+                const importStyle = document.createElement('style');
+                importStyle.setAttribute('data-askview-katex', 'true');
+                importStyle.textContent = `@import url("${cssHref}");`;
+                this.shadowRoot.appendChild(importStyle);
+                console.log('[AskView] Injected KaTeX CSS via @import fallback');
+                return;
+            }
+
+            const markerAttr = 'data-askview-katex';
+
+            if (this.shadowRoot.adoptedStyleSheets) {
+                const sheet = new CSSStyleSheet();
+                sheet.replaceSync(cssText);
+                this.shadowRoot.adoptedStyleSheets = [...this.shadowRoot.adoptedStyleSheets, sheet];
+                const marker = document.createElement('style');
+                marker.setAttribute(markerAttr, 'true');
+                marker.textContent = '/* KaTeX styles applied via adoptedStyleSheets */';
+                this.shadowRoot.appendChild(marker);
+            } else {
+                const styleEl = document.createElement('style');
+                styleEl.setAttribute(markerAttr, 'true');
+                styleEl.textContent = cssText;
+                this.shadowRoot.appendChild(styleEl);
+            }
+
+            console.log('[AskView] Injected KaTeX CSS into shadow root');
+        } catch (error) {
+            console.error('[AskView] Failed to inject KaTeX styles into shadow root:', error);
+        }
+    }
+
     handleCloseAskWindow() {
         // Clear conversation history when closing
         this.conversationHistory = [];
@@ -1882,7 +1955,8 @@ export class AskView extends LitElement {
                         'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 
                         'msqrt', 'mroot', 'mtext', 'mspace', 'mpadded', 'mphantom', 'mfenced', 
                         'menclose', 'mstyle', 'munder', 'mover', 'munderover', 'mmultiscripts', 
-                        'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction'
+                        'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction',
+                        'annotation'
                     ],
                     ALLOWED_ATTR: [
                         'href', 'src', 'alt', 'title', 'class', 'id', 'target', 'rel',
@@ -1897,7 +1971,7 @@ export class AskView extends LitElement {
                         'linethickness', 'notation', 'selection', 'open', 'close', 'separators', 
                         'subscriptshift', 'superscriptshift', 'lspace', 'rspace', 'stretchy', 
                         'symmetric', 'maxsize', 'minsize', 'largeop', 'movablelimits', 
-                        'separator', 'fence', 'form', 'infix', 'prefix', 'postfix'
+                        'separator', 'fence', 'form', 'infix', 'prefix', 'postfix', 'encoding'
                     ],
                 });
             }
@@ -1931,9 +2005,18 @@ export class AskView extends LitElement {
             
             // Process each text node that might contain LaTeX
             textNodes.forEach(textNode => {
+                const parentElement = textNode.parentElement;
+
+                // Skip nodes that already live inside rendered KaTeX output or should remain untouched
+                if (parentElement) {
+                    if (parentElement.closest('.katex') || parentElement.closest('annotation') || parentElement.closest('code, pre, script, style')) {
+                        return;
+                    }
+                }
+
                 const originalText = textNode.nodeValue;
                 const processedText = this.renderLaTeX(originalText);
-                
+
                 if (processedText !== originalText) {
                     // Create a temporary container to parse the HTML
                     const tempDiv = document.createElement('div');
@@ -2099,7 +2182,8 @@ export class AskView extends LitElement {
                                 'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 
                                 'msqrt', 'mroot', 'mtext', 'mspace', 'mpadded', 'mphantom', 'mfenced', 
                                 'menclose', 'mstyle', 'munder', 'mover', 'munderover', 'mmultiscripts', 
-                                'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction'
+                                'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction',
+                                'annotation'
                             ],
                             ALLOWED_ATTR: [
                                 'href', 'src', 'alt', 'title', 'class', 'id', 'target', 'rel',
@@ -2114,7 +2198,7 @@ export class AskView extends LitElement {
                                 'linethickness', 'notation', 'selection', 'open', 'close', 'separators', 
                                 'subscriptshift', 'superscriptshift', 'lspace', 'rspace', 'stretchy', 
                                 'symmetric', 'maxsize', 'minsize', 'largeop', 'movablelimits', 
-                                'separator', 'fence', 'form', 'infix', 'prefix', 'postfix'
+                                'separator', 'fence', 'form', 'infix', 'prefix', 'postfix', 'encoding'
                             ],
                         });
                     } else {
@@ -2230,7 +2314,8 @@ export class AskView extends LitElement {
                         'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 
                         'msqrt', 'mroot', 'mtext', 'mspace', 'mpadded', 'mphantom', 'mfenced', 
                         'menclose', 'mstyle', 'munder', 'mover', 'munderover', 'mmultiscripts', 
-                        'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction'
+                        'mtable', 'mtr', 'mtd', 'mlabeledtr', 'maligngroup', 'malignmark', 'maction',
+                        'annotation'
                     ],
                     ALLOWED_ATTR: [
                         'href', 'src', 'alt', 'title', 'class', 'id', 'target', 'rel',
@@ -2245,7 +2330,7 @@ export class AskView extends LitElement {
                         'linethickness', 'notation', 'selection', 'open', 'close', 'separators', 
                         'subscriptshift', 'superscriptshift', 'lspace', 'rspace', 'stretchy', 
                         'symmetric', 'maxsize', 'minsize', 'largeop', 'movablelimits', 
-                        'separator', 'fence', 'form', 'infix', 'prefix', 'postfix'
+                        'separator', 'fence', 'form', 'infix', 'prefix', 'postfix', 'encoding'
                     ],
                 });
 
@@ -2948,7 +3033,16 @@ export class AskView extends LitElement {
         });
     }
 
-    firstUpdated() {
+    async firstUpdated() {
+        try {
+            if (this.libraryLoadPromise) {
+                await this.libraryLoadPromise;
+            }
+        } catch (error) {
+            console.error('[AskView] Library load failed before firstUpdated:', error);
+        }
+
+        await this.ensureKaTeXShadowStyles();
         setTimeout(() => this.adjustWindowHeight(), 200);
     }
 
