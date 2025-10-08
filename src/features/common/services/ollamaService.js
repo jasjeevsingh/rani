@@ -393,10 +393,43 @@ class OllamaService extends EventEmitter {
         try {
             // Get actually installed models
             const installedModels = await this.getInstalledModelsList();
+            const installedNames = installedModels.map(m => m.name);
             
-            // Get user input history from storage (we'll implement this in the frontend)
-            // For now, just return installed models
-            return installedModels;
+            console.log('[OllamaService] Installed models:', installedNames);
+            
+            // Popular Ollama models to suggest
+            const popularModels = [
+                { name: 'llama3.2:latest', size: '~2GB', description: 'Llama 3.2 - Latest version, great all-rounder' },
+                { name: 'llama3.2:3b', size: '~2GB', description: 'Llama 3.2 3B - Fast and efficient' },
+                { name: 'llama3.1:8b', size: '~4.7GB', description: 'Llama 3.1 8B - Balanced performance' },
+                { name: 'gemma2:2b', size: '~1.6GB', description: 'Gemma 2 2B - Lightweight Google model' },
+                { name: 'qwen2.5:3b', size: '~2GB', description: 'Qwen 2.5 3B - Excellent for multilingual' },
+                { name: 'phi3:mini', size: '~2.3GB', description: 'Phi-3 Mini - Microsoft\'s efficient model' },
+                { name: 'mistral:7b', size: '~4.1GB', description: 'Mistral 7B - High quality open model' },
+                { name: 'codellama:7b', size: '~3.8GB', description: 'Code Llama 7B - Specialized for coding' },
+            ];
+            
+            // Mark which models are already installed
+            const suggestions = popularModels.map(model => ({
+                ...model,
+                installed: installedNames.includes(model.name),
+                status: installedNames.includes(model.name) ? 'installed' : 'available'
+            }));
+            
+            // Add any installed models that aren't in the popular list
+            for (const installed of installedModels) {
+                if (!popularModels.some(p => p.name === installed.name)) {
+                    suggestions.push({
+                        name: installed.name,
+                        size: installed.size || 'Unknown',
+                        description: `Custom model: ${installed.name}`,
+                        installed: true,
+                        status: 'installed'
+                    });
+                }
+            }
+            
+            return suggestions;
         } catch (error) {
             console.error('[OllamaService] Failed to get model suggestions:', error);
             return [];
@@ -453,6 +486,15 @@ class OllamaService extends EventEmitter {
                         
                         try {
                             const data = JSON.parse(line);
+                            
+                            // Check for errors
+                            if (data.error) {
+                                console.error(`[OllamaService] Pull error for ${modelName}:`, data.error);
+                                this.clearInstallProgress(modelName);
+                                reject(new Error(data.error));
+                                return;
+                            }
+                            
                             const progress = this._parseOllamaPullProgress(data, modelName);
                             
                             if (progress !== null) {

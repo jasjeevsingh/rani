@@ -88,6 +88,12 @@ function getActiveProvider(type) {
     const stmt = db.prepare(`SELECT * FROM provider_settings WHERE ${column} = 1`);
     const result = stmt.get() || null;
     
+    if (result) {
+        console.log(`[ProviderSettings] getActiveProvider(${type}) - Found: ${result.provider}, llm_model: ${result.selected_llm_model}, stt_model: ${result.selected_stt_model}`);
+    } else {
+        console.log(`[ProviderSettings] getActiveProvider(${type}) - No active provider found`);
+    }
+    
     if (result && result.api_key && encryptionService.looksEncrypted(result.api_key)) {
         result.api_key = encryptionService.decrypt(result.api_key);
     }

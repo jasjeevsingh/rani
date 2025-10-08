@@ -5,6 +5,7 @@ const encryptionService = require('./encryptionService');
 const providerSettingsRepository = require('../repositories/providerSettings');
 const authService = require('./authService');
 const ollamaModelRepository = require('../repositories/ollamaModel');
+const ollamaService = require('./ollamaService');
 
 class ModelStateService extends EventEmitter {
     constructor() {
@@ -282,16 +283,31 @@ class ModelStateService extends EventEmitter {
             type = arg2;
         }
         if (!modelId || !type) return null;
+        
+        // Check static provider models first
         for (const providerId in PROVIDERS) {
             const models = type === 'llm' ? PROVIDERS[providerId].llmModels : PROVIDERS[providerId].sttModels;
             if (models && models.some(m => m.id === modelId)) {
                 return providerId;
             }
         }
+        
+        // Check Ollama models (both installed and available)
         if (type === 'llm') {
+            // Check if it's an Ollama model format (e.g., "llama3.2:latest", "gemma2:2b")
+            // Ollama models typically have a colon in the name
+            if (modelId.includes(':') || modelId.includes('/')) {
+                console.log(`[ModelStateService] Detected Ollama model format: ${modelId}`);
+                return 'ollama';
+            }
+            
+            // Also check installed models as fallback
             const installedModels = ollamaModelRepository.getInstalledModels();
-            if (installedModels.some(m => m.name === modelId)) return 'ollama';
+            if (installedModels.some(m => m.name === modelId)) {
+                return 'ollama';
+            }
         }
+        
         return null;
     }
 
@@ -304,25 +320,31 @@ class ModelStateService extends EventEmitter {
     }
     
     async setSelectedModel(type, modelId) {
+        console.log(`[ModelStateService] setSelectedModel called - type: ${type}, modelId: ${modelId}`);
+        
         const provider = this.getProviderForModel(modelId, type);
         if (!provider) {
             console.warn(`[ModelStateService] No provider found for model ${modelId}`);
             return false;
         }
 
+        console.log(`[ModelStateService] Found provider: ${provider} for model: ${modelId}`);
+
         const existingSettings = await providerSettingsRepository.getByProvider(provider) || {};
         const newSettings = { ...existingSettings };
 
         if (type === 'llm') {
             newSettings.selected_llm_model = modelId;
+            console.log(`[ModelStateService] Setting selected_llm_model to: ${modelId}`);
         } else {
             newSettings.selected_stt_model = modelId;
+            console.log(`[ModelStateService] Setting selected_stt_model to: ${modelId}`);
         }
         
         await providerSettingsRepository.upsert(provider, newSettings);
         await providerSettingsRepository.setActiveProvider(provider, type);
         
-        console.log(`[ModelStateService] Selected ${type} model: ${modelId} (provider: ${provider})`);
+        console.log(`[ModelStateService] Successfully saved and activated provider: ${provider} for ${type} with model: ${modelId}`);
         
         if (type === 'llm' && provider === 'ollama') {
             require('./localAIManager').warmUpModel(modelId).catch(err => console.warn(err));
@@ -343,8 +365,23 @@ class ModelStateService extends EventEmitter {
 
             const providerId = setting.provider;
             if (providerId === 'ollama' && type === 'llm') {
-                const installed = ollamaModelRepository.getInstalledModels();
-                available.push(...installed.map(m => ({ id: m.name, name: m.name })));
+                // Get model suggestions which includes both installed and popular models
+                try {
+                    const suggestions = await ollamaService.getModelSuggestions();
+                    available.push(...suggestions.map(m => ({ 
+                        id: m.name, 
+                        name: m.name,
+                        description: m.description,
+                        size: m.size,
+                        installed: m.installed,
+                        status: m.status
+                    })));
+                } catch (error) {
+                    console.error('[ModelStateService] Failed to get Ollama suggestions:', error);
+                    // Fallback to just installed models
+                    const installed = ollamaModelRepository.getInstalledModels();
+                    available.push(...installed.map(m => ({ id: m.name, name: m.name, installed: true })));
+                }
             } else if (PROVIDERS[providerId]?.[modelListKey]) {
                 available.push(...PROVIDERS[providerId][modelListKey]);
             }
@@ -354,10 +391,18 @@ class ModelStateService extends EventEmitter {
 
     async getCurrentModelInfo(type) {
         const activeSetting = await providerSettingsRepository.getActiveProvider(type);
-        if (!activeSetting) return null;
+        if (!activeSetting) {
+            console.warn(`[ModelStateService] No active provider found for type: ${type}`);
+            return null;
+        }
         
         const model = type === 'llm' ? activeSetting.selected_llm_model : activeSetting.selected_stt_model;
-        if (!model) return null;
+        if (!model) {
+            console.warn(`[ModelStateService] No selected model found for type: ${type}, provider: ${activeSetting.provider}`);
+            return null;
+        }
+
+        console.log(`[ModelStateService] getCurrentModelInfo - type: ${type}, provider: ${activeSetting.provider}, model: ${model}`);
 
         return {
             provider: activeSetting.provider,

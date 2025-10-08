@@ -404,31 +404,104 @@ export class SettingsView extends LitElement {
             overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 4px;
             padding: 4px; margin-top: 4px;
         }
+        .model-list { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 4px; 
+            margin-top: 6px; 
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 2px;
+        }
+        
+        .model-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .model-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
+        }
+        
+        .model-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+        
         .model-item { 
-            padding: 5px 8px; 
+            padding: 8px; 
             font-size: 11px; 
-            border-radius: 3px; 
+            border-radius: 4px; 
             cursor: pointer; 
             transition: background-color 0.15s; 
             display: flex; 
             justify-content: space-between; 
-            align-items: center; 
+            align-items: center;
+            gap: 8px;
         }
         .model-item:hover { background-color: rgba(255,255,255,0.1); }
         .model-item.selected { background-color: rgba(0, 122, 255, 0.4); font-weight: 500; }
+        
+        .model-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .model-name {
+            font-weight: 500;
+            color: white;
+        }
+        
+        .model-description {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.3;
+        }
+        
+        .model-size {
+            font-size: 9px;
+            color: rgba(255, 200, 100, 0.7);
+        }
+        
         .model-status { 
             font-size: 9px; 
             color: rgba(255,255,255,0.6); 
-            margin-left: 8px; 
+            white-space: nowrap;
         }
         .model-status.installed { color: rgba(0, 255, 0, 0.8); }
         .model-status.not-installed { color: rgba(255, 200, 0, 0.8); }
+        
+        .model-install-btn {
+            background: rgba(60, 120, 255, 0.9);
+            color: white;
+            border: 1px solid rgba(100, 160, 255, 0.5);
+            border-radius: 4px;
+            padding: 6px 14px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        
+        .model-install-btn:hover {
+            background: rgba(80, 140, 255, 1);
+            border-color: rgba(120, 180, 255, 0.8);
+            transform: translateY(-1px);
+        }
+        
+        .model-install-btn:active {
+            transform: translateY(0);
+        }
+        
         .install-progress {
-            flex: 1;
+            flex: 0 0 100px;
             height: 4px;
             background: rgba(255,255,255,0.1);
             border-radius: 2px;
-            margin-left: 8px;
             overflow: hidden;
         }
         .install-progress-bar {
@@ -819,6 +892,7 @@ export class SettingsView extends LitElement {
             window.api.settingsView.getSelectedModels(),
             window.api.settingsView.getAllKeys()
         ]);
+        console.log('[SettingsView] Available LLM models:', availableLlm);
         this.availableLlmModels = availableLlm;
         this.availableSttModels = availableStt;
         this.selectedLlm = selected.llm;
@@ -848,8 +922,9 @@ export class SettingsView extends LitElement {
         // Check if this is an Ollama model that needs to be installed
         const provider = this.getProviderForModel(type, modelId);
         if (provider === 'ollama') {
-            const ollamaModel = this.ollamaModels.find(m => m.name === modelId);
-            if (ollamaModel && !ollamaModel.installed && !ollamaModel.installing) {
+            // Find the model in the available models list
+            const model = this.availableLlmModels.find(m => m.id === modelId);
+            if (model && !model.installed && !this.installingModels[modelId]) {
                 // Need to install the model first
                 await this.installOllamaModel(modelId);
                 return;
@@ -910,6 +985,9 @@ export class SettingsView extends LitElement {
                     delete this.installingModels[modelName];
                     this.requestUpdate();
                     
+                    // Wait a moment for Ollama to update its model list
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
                     // 상태 새로고침
                     await this.refreshOllamaStatus();
                     await this.refreshModelData();
@@ -924,6 +1002,14 @@ export class SettingsView extends LitElement {
             console.error(`[SettingsView] Error installing model ${modelName}:`, error);
             delete this.installingModels[modelName];
             this.requestUpdate();
+            
+            // Show error to user
+            const errorMsg = error.message || 'Installation failed';
+            if (errorMsg.includes('id_ed25519')) {
+                alert(`Failed to install ${modelName}:\n\nOllama needs an SSH key for authentication. Please try running this command in your terminal:\n\nssh-keygen -t ed25519 -f ~/.ollama/id_ed25519 -N ""\n\nThen restart the app and try again.`);
+            } else {
+                alert(`Failed to install ${modelName}:\n\n${errorMsg}`);
+            }
         }
     }
     
@@ -983,6 +1069,17 @@ export class SettingsView extends LitElement {
     }
     
     getProviderForModel(type, modelId) {
+        // Pattern-based detection for Ollama models (contains : or /)
+        if (modelId.includes(':') || modelId.includes('/')) {
+            return 'ollama';
+        }
+        
+        // Pattern-based detection for Whisper models
+        if (modelId.startsWith('whisper-')) {
+            return 'whisper';
+        }
+        
+        // Check providerConfig for other models
         for (const [providerId, config] of Object.entries(this.providerConfig)) {
             const models = type === 'llm' ? config.llmModels : config.sttModels;
             if (models?.some(m => m.id === modelId)) {
@@ -1401,24 +1498,56 @@ export class SettingsView extends LitElement {
                         <div class="model-list">
                             ${this.availableLlmModels.map(model => {
                                 const isOllama = this.getProviderForModel('llm', model.id) === 'ollama';
-                                const ollamaModel = isOllama ? this.ollamaModels.find(m => m.name === model.id) : null;
                                 const isInstalling = this.installingModels[model.id] !== undefined;
                                 const installProgress = this.installingModels[model.id] || 0;
                                 
+                                // Debug log
+                                if (isOllama) {
+                                    console.log(`[SettingsView] ${model.id}:`, {
+                                        installed: model.installed,
+                                        installedType: typeof model.installed,
+                                        isInstalling,
+                                        hasInstallBtn: model.installed !== true && !isInstalling
+                                    });
+                                }
+                                
                                 return html`
                                     <div class="model-item ${this.selectedLlm === model.id ? 'selected' : ''}" 
-                                         @click=${() => this.selectModel('llm', model.id)}>
-                                        <span>${model.name}</span>
+                                         @click=${(e) => {
+                                             // Only allow selection if model is installed
+                                             if (model.installed === true && !isInstalling) {
+                                                 this.selectModel('llm', model.id);
+                                             }
+                                         }}>
+                                        <div class="model-info">
+                                            <span class="model-name">${model.name}</span>
+                                            ${model.description ? html`
+                                                <span class="model-description">${model.description}</span>
+                                            ` : ''}
+                                            ${model.size ? html`
+                                                <span class="model-size">${model.size}</span>
+                                            ` : ''}
+                                        </div>
                                         ${isOllama ? html`
-                                            ${isInstalling ? html`
-                                                <div class="install-progress">
-                                                    <div class="install-progress-bar" style="width: ${installProgress}%"></div>
-                                </div>
-                                            ` : ollamaModel?.installed ? html`
-                                                <span class="model-status installed">✓ Installed</span>
-                                            ` : html`
-                                                <span class="model-status not-installed">Click to install</span>
-                                            `}
+                                            <div style="display: flex; align-items: center; gap: 4px;">
+                                                ${isInstalling ? html`
+                                                    <div class="install-progress">
+                                                        <div class="install-progress-bar" style="width: ${installProgress}%"></div>
+                                                    </div>
+                                                ` : (model.installed === true) ? html`
+                                                    <span class="model-status installed">✓ Installed</span>
+                                                ` : html`
+                                                    <button class="model-install-btn" 
+                                                            @click=${(e) => { 
+                                                                e.stopPropagation(); 
+                                                                e.preventDefault();
+                                                                console.log('[SettingsView] Install clicked for:', model.id);
+                                                                this.installOllamaModel(model.id); 
+                                                            }}>
+                                                        Install
+                                                    </button>
+                                                `}
+                                            </div>
                                         ` : ''}
                                     </div>
                                 `;
