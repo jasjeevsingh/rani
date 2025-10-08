@@ -26,24 +26,29 @@ class ResearchFeature {
 
     setupIpcHandlers() {
         // Document management
-        this.ipc.handle('documents:import', async (filePath, userId, metadata = {}) => {
+        this.ipc.handle('documents:import', async (event, filePath, metadata = {}) => {
+            const userId = await this.getCurrentUserId();
             return await this.documentService.importDocument(filePath, userId, metadata);
         });
 
-        this.ipc.handle('documents:getUserDocuments', async (userId, limit = 50) => {
+        this.ipc.handle('documents:getUserDocuments', async (event, limit = 50) => {
+            const userId = await this.getCurrentUserId();
             return await this.documentService.getUserDocuments(userId, limit);
         });
 
-        this.ipc.handle('documents:search', async (userId, searchTerm, limit = 20) => {
+        this.ipc.handle('documents:search', async (event, searchTerm, limit = 20) => {
+            const userId = await this.getCurrentUserId();
             return await this.documentService.searchDocuments(userId, searchTerm, limit);
         });
 
-        this.ipc.handle('documents:getDocument', async (documentId) => {
-            return await this.documentService.getDocument(documentId);
+        this.ipc.handle('documents:getDocument', async (event, documentId) => {
+            const userId = await this.getCurrentUserId();
+            return await this.documentService.getDocument(documentId, userId);
         });
 
-        this.ipc.handle('documents:deleteDocument', async (documentId) => {
-            return await this.documentService.deleteDocument(documentId);
+        this.ipc.handle('documents:deleteDocument', async (event, documentId) => {
+            const userId = await this.getCurrentUserId();
+            return await this.documentService.deleteDocument(documentId, userId);
         });
 
         this.ipc.handle('documents:selectAndUpload', async () => {
@@ -141,7 +146,8 @@ class ResearchFeature {
      */
     async openDocumentViewer(documentId) {
         try {
-            const document = await this.documentService.getDocument(documentId);
+            const userId = await this.getCurrentUserId();
+            const document = await this.documentService.getDocument(documentId, userId);
             if (!document) {
                 throw new Error('Document not found');
             }
@@ -248,7 +254,8 @@ class ResearchFeature {
             const documents = [];
             if (conversationData.documents && conversationData.documents.length > 0) {
                 for (const docId of conversationData.documents) {
-                    const doc = await this.documentService.getDocument(docId);
+                    const userId = await this.getCurrentUserId();
+                    const doc = await this.documentService.getDocument(docId, userId);
                     if (doc) documents.push(doc);
                 }
             }
