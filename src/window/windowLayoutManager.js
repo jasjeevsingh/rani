@@ -152,7 +152,8 @@ class WindowLayoutManager {
         const listen = this.windowPool.get('listen');
         const research = this.windowPool.get('research');
     
-        const askVis = visibility.ask && ask && !ask.isDestroyed();
+        // Skip ask window in sidebar mode - it's embedded in header
+        const askVis = false; // Ask is always embedded in sidebar now
         const listenVis = visibility.listen && listen && !listen.isDestroyed();
         const researchVis = visibility.research && research && !research.isDestroyed();
     
@@ -183,22 +184,76 @@ class WindowLayoutManager {
     
         const layout = {};
         
-        // Handle research window separately since it's larger
+        // Handle research window - position to LEFT of sidebar
         if (researchVis) {
-            let xRel = headerCenterXRel - researchB.width / 2;
-            xRel = Math.max(PAD, Math.min(screenWidth - researchB.width - PAD, xRel));
-    
-            let yPos;
-            if (strategy.primary === 'above') {
-                yPos = (headerBounds.y - workAreaY) - PAD - researchB.height;
-            } else { // 'below'
-                yPos = (headerBounds.y - workAreaY) + headerBounds.height + PAD;
-            }
+            // Position Research to the left of the sidebar (similar to Listen)
+            const sidebarX = headerBounds.x; // Left edge of sidebar
+            let xRel = sidebarX - researchB.width - PAD - workAreaX; // Position to the left with padding
             
-            layout.research = { x: Math.round(xRel + workAreaX), y: Math.round(yPos + workAreaY), width: researchB.width, height: researchB.height };
+            // Ensure it doesn't go off-screen
+            xRel = Math.max(PAD, xRel);
+            
+            // Vertically center with the header
+            let yPos = (headerBounds.y - workAreaY) + (headerBounds.height / 2) - (researchB.height / 2);
+            
+            // Ensure vertical position is within bounds
+            yPos = Math.max(PAD, Math.min(screenHeight - researchB.height - PAD, yPos));
+            
+            layout.research = { 
+                x: Math.round(xRel + workAreaX), 
+                y: Math.round(yPos + workAreaY), 
+                width: researchB.width, 
+                height: researchB.height 
+            };
+            
+            console.log('[Layout Debug] Research positioned to left of sidebar:', layout.research);
         }
     
-        if (askVis && listenVis && !researchVis) {
+        // Handle Listen + Research both visible - stack vertically on the left
+        if (listenVis && researchVis) {
+            const sidebarX = headerBounds.x; // Left edge of sidebar
+            
+            // Position Research window
+            let researchXRel = sidebarX - researchB.width - PAD - workAreaX;
+            researchXRel = Math.max(PAD, researchXRel);
+            
+            // Position Listen window above Research (or below if not enough space above)
+            let listenXRel = sidebarX - listenB.width - PAD - workAreaX;
+            listenXRel = Math.max(PAD, listenXRel);
+            
+            // Calculate vertical positions - try to center both around header
+            const totalHeight = researchB.height + PAD + listenB.height;
+            const headerCenterY = (headerBounds.y - workAreaY) + (headerBounds.height / 2);
+            
+            let researchYPos = headerCenterY - (totalHeight / 2);
+            let listenYPos = researchYPos + researchB.height + PAD;
+            
+            // Adjust if it goes off-screen
+            if (researchYPos < PAD) {
+                researchYPos = PAD;
+                listenYPos = researchYPos + researchB.height + PAD;
+            }
+            if (listenYPos + listenB.height > screenHeight - PAD) {
+                listenYPos = screenHeight - PAD - listenB.height;
+                researchYPos = listenYPos - researchB.height - PAD;
+            }
+            
+            layout.research = {
+                x: Math.round(researchXRel + workAreaX),
+                y: Math.round(researchYPos + workAreaY),
+                width: researchB.width,
+                height: researchB.height
+            };
+            
+            layout.listen = {
+                x: Math.round(listenXRel + workAreaX),
+                y: Math.round(listenYPos + workAreaY),
+                width: listenB.width,
+                height: listenB.height
+            };
+            
+            console.log('[Layout Debug] Listen + Research stacked on left:', { listen: layout.listen, research: layout.research });
+        } else if (askVis && listenVis && !researchVis) {
             let askXRel = headerCenterXRel - (askB.width / 2);
             let listenXRel = askXRel - listenB.width - PAD;
     
@@ -224,18 +279,35 @@ class WindowLayoutManager {
             const winName = askVis ? 'ask' : 'listen';
             const winB = askVis ? askB : listenB;
             if (!winB) return {};
-    
-            let xRel = headerCenterXRel - winB.width / 2;
-            xRel = Math.max(PAD, Math.min(screenWidth - winB.width - PAD, xRel));
-    
-            let yPos;
-            if (strategy.primary === 'above') {
-                yPos = (headerBounds.y - workAreaY) - PAD - winB.height;
-            } else { // 'below'
-                yPos = (headerBounds.y - workAreaY) + headerBounds.height + PAD;
+            
+            let xRel, yPos;
+            
+            // Position listen window to the left of the sidebar
+            if (listenVis) {
+                // Get sidebar position (header is at right edge of screen)
+                const sidebarX = headerBounds.x; // Left edge of sidebar
+                xRel = sidebarX - winB.width - PAD - workAreaX; // Position to the left with padding
+                
+                // Vertically center with the header
+                yPos = (headerBounds.y - workAreaY) + (headerBounds.height / 2) - (winB.height / 2);
+            } else {
+                // Original centered positioning for ask window
+                xRel = headerCenterXRel - winB.width / 2;
+                xRel = Math.max(PAD, Math.min(screenWidth - winB.width - PAD, xRel));
+                
+                if (strategy.primary === 'above') {
+                    yPos = (headerBounds.y - workAreaY) - PAD - winB.height;
+                } else { // 'below'
+                    yPos = (headerBounds.y - workAreaY) + headerBounds.height + PAD;
+                }
             }
             
-            layout[winName] = { x: Math.round(xRel + workAreaX), y: Math.round(yPos + workAreaY), width: winB.width, height: winB.height };
+            layout[winName] = { 
+                x: Math.round(Math.max(PAD, xRel) + workAreaX), 
+                y: Math.round(Math.max(PAD, Math.min(screenHeight - winB.height - PAD, yPos)) + workAreaY), 
+                width: winB.width, 
+                height: winB.height 
+            };
         }
         return layout;
     }

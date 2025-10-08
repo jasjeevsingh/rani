@@ -20,6 +20,7 @@ export class AskView extends LitElement {
         voiceActivity: { type: Boolean },
         conversationalResponse: { type: String },
         conversationHistory: { type: Array },
+        embedded: { type: Boolean }, // New: Embedded mode flag for sidebar
     };
 
     static styles = css`
@@ -32,6 +33,94 @@ export class AskView extends LitElement {
             backface-visibility: hidden;
             transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s ease-out;
             will-change: transform, opacity;
+        }
+
+        /* Embedded mode: Adapt for sidebar (380px width) */
+        :host([embedded]) {
+            /* Remove standalone window animations and transitions */
+        }
+
+        :host([embedded]) .ask-container {
+            /* Remove window-specific styling for embedded mode */
+            background: transparent;
+            border-radius: 0;
+            outline: none;
+            backdrop-filter: none;
+            max-height: none;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        :host([embedded]) .ask-container::before {
+            /* Remove blur backdrop in embedded mode */
+            display: none;
+        }
+
+        :host([embedded]) .response-header {
+            /* Hide header in embedded mode (sidebar has its own header) */
+            display: none;
+        }
+
+        :host([embedded]) .close-button {
+            /* Hide close button in embedded mode (sidebar manages visibility) */
+            display: none;
+        }
+
+        :host([embedded]) .conversation-container {
+            /* Adjust container for sidebar - fill available space */
+            max-height: none;
+            flex: 1 1 auto;
+            min-height: 0;
+            /* Ensure proper scrolling stays within bounds */
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 12px 16px;
+        }
+
+        :host([embedded]) .text-input-container {
+            /* Simplify input styling for sidebar */
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            flex: 0 0 auto;
+        }
+
+        :host([embedded]) #textInput {
+            /* Adjust input for narrower sidebar width */
+            padding: 8px 12px;
+        }
+
+        :host([embedded]) .submit-btn {
+            /* Adjust button for sidebar */
+            padding: 0 12px;
+        }
+
+        :host([embedded]) .mic-button {
+            /* Adjust mic button size for sidebar */
+            width: 36px;
+            height: 36px;
+        }
+
+        :host([embedded]) .conversation-message {
+            /* Adjust message width for sidebar */
+            max-width: 100%;
+        }
+
+        :host([embedded]) .conversation-message-content {
+            /* Better text wrapping in narrower sidebar */
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        /* Disable window resize animations in embedded mode */
+        :host([embedded]) .hiding,
+        :host([embedded]) .showing,
+        :host([embedded]) .hidden {
+            animation: none;
+            opacity: 1;
+            transform: none;
         }
 
         :host(.hiding) {
@@ -190,8 +279,7 @@ export class AskView extends LitElement {
             box-sizing: border-box;
             position: relative;
             overflow: hidden;
-            max-height: 700px; /* Ensure container doesn't exceed maximum */
-        }
+            max-height: 700px; /* Ensure container doesn't exceed maximum in standalone mode */
         }
 
         .ask-container::before {
@@ -502,7 +590,7 @@ export class AskView extends LitElement {
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
             transform-origin: bottom;
-            flex-shrink: 0; /* Never shrink the input bar */
+            flex: 0 0 auto; /* Never grow or shrink the input bar */
             backdrop-filter: blur(10px);
             border-radius: 0 0 12px 12px; /* Match parent container radius */
         }
@@ -817,12 +905,13 @@ export class AskView extends LitElement {
 
         /* Conversation History Styles */
         .conversation-container {
-            flex: 1;
+            flex: 1 1 auto;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 16px;
             background: transparent;
             min-height: 0; /* Allow flexbox to shrink this */
-            max-height: 600px; /* Conservative max height to ensure input bar space */
+            max-height: 600px; /* Conservative max height in standalone mode */
         }
 
         .conversation-container::-webkit-scrollbar {
@@ -935,6 +1024,7 @@ export class AskView extends LitElement {
         this.conversationalResponse = '';
         this.conversationHistory = [];
         this.conversationHistoryLoaded = false; // Flag to prevent duplicate loading
+        this.embedded = false; // Default to standalone mode
 
         // TTS chunking state
         this.isChunkedTTSActive = false;
@@ -981,23 +1071,30 @@ export class AskView extends LitElement {
         console.log(`🔍 [Debug] connectedCallback - loaded flag: ${this.conversationHistoryLoaded}, history length: ${this.conversationHistory.length}`);
         console.log('📱 AskView connectedCallback - IPC 이벤트 리스너 설정');
         
-        // Load conversation history when component mounts
-        // TODO: Implement conversation history loading
-        // this.loadConversationHistory();        document.addEventListener('keydown', this.handleEscKey);
+        // Load conversation history when component mounts (especially in embedded mode)
+        if (this.embedded && !this.conversationHistoryLoaded) {
+            console.log('[AskView] Embedded mode detected - loading conversation history');
+            this.loadConversationHistory();
+        }
+        
+        document.addEventListener('keydown', this.handleEscKey);
 
-        this.resizeObserver = new ResizeObserver(entries => {
-            for (const entry of entries) {
-                const needed = entry.contentRect.height;
-                const current = window.innerHeight;
+        // Skip ResizeObserver in embedded mode (sidebar manages layout)
+        if (!this.embedded) {
+            this.resizeObserver = new ResizeObserver(entries => {
+                for (const entry of entries) {
+                    const needed = entry.contentRect.height;
+                    const current = window.innerHeight;
 
-                if (needed > current - 4) {
-                    this.requestWindowResize(Math.ceil(needed));
+                    if (needed > current - 4) {
+                        this.requestWindowResize(Math.ceil(needed));
+                    }
                 }
-            }
-        });
+            });
 
-        const container = this.shadowRoot?.querySelector('.ask-container');
-        if (container) this.resizeObserver.observe(container);
+            const container = this.shadowRoot?.querySelector('.ask-container');
+            if (container) this.resizeObserver.observe(container);
+        }
 
         this.handleQuestionFromAssistant = (event, question) => {
             console.log('AskView: Received question from ListenView:', question);
@@ -2116,6 +2213,11 @@ export class AskView extends LitElement {
 
 
     requestWindowResize(targetHeight) {
+        // Skip in embedded mode
+        if (this.embedded) {
+            return;
+        }
+        
         if (window.api) {
             window.api.askView.adjustWindowHeight(targetHeight);
         }
@@ -2906,7 +3008,7 @@ export class AskView extends LitElement {
                         <input
                             type="text"
                             id="textInput"
-                            placeholder="${this.isListening ? 'Listening...' : 'Ask about your screen or audio'}"
+                            placeholder="${this.isListening ? 'Listening...' : ' Ask me anything!'}"
                             @keydown=${this.handleTextKeydown}
                             @focus=${this.handleInputFocus}
                             ?disabled=${this.isListening}
@@ -2930,6 +3032,11 @@ export class AskView extends LitElement {
 
     // Dynamically resize the BrowserWindow to fit current content
     adjustWindowHeight() {
+        // Skip window resizing in embedded mode (sidebar manages its own height)
+        if (this.embedded) {
+            return;
+        }
+        
         if (!window.api) return;
 
         this.updateComplete.then(() => {

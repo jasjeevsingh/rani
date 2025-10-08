@@ -588,38 +588,8 @@ function createFeatureWindows(header, namesToCreate) {
                 break;
             }
 
-            // ask
-            case 'ask': {
-                const ask = new BrowserWindow({ ...commonChildOptions, width:600 });
-                ask.setContentProtection(isContentProtectionOn);
-                ask.setVisibleOnAllWorkspaces(true,{visibleOnFullScreen:true});
-                if (process.platform === 'darwin') {
-                    ask.setWindowButtonVisibility(false);
-                }
-                const askLoadOptions = { query: { view: 'ask' } };
-                if (!shouldUseLiquidGlass) {
-                    ask.loadFile(path.join(__dirname, '../ui/app/content.html'), askLoadOptions);
-                }
-                else {
-                    askLoadOptions.query.glass = 'true';
-                    ask.loadFile(path.join(__dirname, '../ui/app/content.html'), askLoadOptions);
-                    ask.webContents.once('did-finish-load', () => {
-                        const viewId = liquidGlass.addView(ask.getNativeWindowHandle());
-                        if (viewId !== -1) {
-                            liquidGlass.unstable_setVariant(viewId, liquidGlass.GlassMaterialVariant.bubbles);
-                            // liquidGlass.unstable_setScrim(viewId, 1);
-                            // liquidGlass.unstable_setSubdued(viewId, 1);
-                        }
-                    });
-                }
-                
-                // Open DevTools in development
-                if (!app.isPackaged) {
-                    ask.webContents.openDevTools({ mode: 'detach' });
-                }
-                windowPool.set('ask', ask);
-                break;
-            }
+            // ask - REMOVED: Now embedded in sidebar (MainHeader component)
+            // The Ask functionality is permanently integrated into the sidebar UI
 
             // research
             case 'research': {
@@ -733,7 +703,7 @@ function createFeatureWindows(header, namesToCreate) {
         createFeatureWindow(namesToCreate);
     } else {
         createFeatureWindow('listen');
-        createFeatureWindow('ask');
+        // 'ask' removed - now embedded in sidebar
         createFeatureWindow('research');
         createFeatureWindow('settings');
         createFeatureWindow('shortcut-settings');
@@ -741,7 +711,7 @@ function createFeatureWindows(header, namesToCreate) {
 }
 
 function destroyFeatureWindows() {
-    const featureWindows = ['listen','ask','research','settings','shortcut-settings'];
+    const featureWindows = ['listen','research','settings','shortcut-settings']; // 'ask' removed - embedded in sidebar
     if (settingsHideTimer) {
         clearTimeout(settingsHideTimer);
         settingsHideTimer = null;
@@ -851,7 +821,7 @@ function createWindows() {
     setupWindowController(windowPool, layoutManager, movementManager);
 
     if (currentHeaderState === 'main') {
-        createFeatureWindows(header, ['listen', 'ask', 'research', 'settings', 'shortcut-settings']);
+        createFeatureWindows(header, ['listen', 'research', 'settings', 'shortcut-settings']); // 'ask' removed - embedded in sidebar
     }
 
     header.setContentProtection(isContentProtectionOn);
@@ -928,9 +898,20 @@ async function toggleResearchView() {
     console.log('[WindowManager] Toggling research view');
     
     const researchWin = windowPool.get('research');
+    const header = windowPool.get('header');
     const isVisible = researchWin && !researchWin.isDestroyed() && researchWin.isVisible();
     
-    internalBridge.emit('window:requestVisibility', { name: 'research', visible: !isVisible });
+    const newVisibility = !isVisible;
+    internalBridge.emit('window:requestVisibility', { name: 'research', visible: newVisibility });
+    
+    // Notify header window about visibility change
+    if (header && !header.isDestroyed()) {
+        header.webContents.send('research:visibilityChanged', { 
+            isVisible: newVisibility 
+        });
+    }
+    
+    return { isVisible: newVisibility };
 }
 
 

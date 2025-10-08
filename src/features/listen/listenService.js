@@ -59,6 +59,8 @@ class ListenService {
         const header = windowPool.get('header');
 
         try {
+            let newState = listenButtonText; // Default to same state
+            
             switch (listenButtonText) {
                 case 'Listen':
                     console.log('[ListenService] changeSession to "Listen"');
@@ -67,6 +69,7 @@ class ListenService {
                     if (listenWindow && !listenWindow.isDestroyed()) {
                         listenWindow.webContents.send('session-state-changed', { isActive: true });
                     }
+                    newState = 'Stop'; // Transition to Stop state
                     break;
         
                 case 'Stop':
@@ -75,23 +78,38 @@ class ListenService {
                     if (listenWindow && !listenWindow.isDestroyed()) {
                         listenWindow.webContents.send('session-state-changed', { isActive: false });
                     }
+                    newState = 'Done'; // Transition to Done state
                     break;
         
                 case 'Done':
                     console.log('[ListenService] changeSession to "Done"');
                     internalBridge.emit('window:requestVisibility', { name: 'listen', visible: false });
                     listenWindow.webContents.send('session-state-changed', { isActive: false });
+                    newState = 'Listen'; // Cycle back to Listen state
                     break;
         
                 default:
                     throw new Error(`[ListenService] unknown listenButtonText: ${listenButtonText}`);
             }
             
-            header.webContents.send('listen:changeSessionResult', { success: true });
+            // Broadcast state to header window
+            if (header && !header.isDestroyed()) {
+                header.webContents.send('listen:changeSessionResult', { 
+                    success: true, 
+                    state: newState 
+                });
+            }
+            
+            return { success: true, state: newState };
 
         } catch (error) {
             console.error('[ListenService] error in handleListenRequest:', error);
-            header.webContents.send('listen:changeSessionResult', { success: false });
+            if (header && !header.isDestroyed()) {
+                header.webContents.send('listen:changeSessionResult', { 
+                    success: false,
+                    state: listenButtonText // Keep current state on error
+                });
+            }
             throw error; 
         }
     }

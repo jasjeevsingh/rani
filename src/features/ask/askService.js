@@ -161,6 +161,31 @@ class AskService {
         console.log('[AskService] Service instance created.');
     }
 
+    /**
+     * Get the target window for sending messages
+     * In sidebar mode, sends to header window; otherwise to standalone ask window
+     * @returns {BrowserWindow|null}
+     * @private
+     */
+    _getTargetWindow() {
+        const windowPool = getWindowPool();
+        if (!windowPool) return null;
+        
+        // Try standalone ask window first (for backward compatibility)
+        let askWin = windowPool.get('ask');
+        if (askWin && !askWin.isDestroyed() && askWin.isVisible()) {
+            return askWin;
+        }
+        
+        // Fallback to header window (sidebar mode)
+        const header = windowPool.get('header');
+        if (header && !header.isDestroyed()) {
+            return header;
+        }
+        
+        return null;
+    }
+
     setupSttCallbacks() {
         console.log('[AskService] Setting up STT callbacks...');
         this.sttService.setCallbacks({
@@ -169,10 +194,10 @@ class AskService {
                 this.state.sttTranscription = text;
                 this._broadcastState();
                 
-                // Send transcription update to the ask window
-                const askWindow = getWindowPool()?.get('ask');
-                if (askWindow && !askWindow.isDestroyed()) {
-                    askWindow.webContents.send('ask:sttUpdate', { 
+                // Send transcription update to the target window
+                const targetWindow = this._getTargetWindow();
+                if (targetWindow && !targetWindow.isDestroyed()) {
+                    targetWindow.webContents.send('ask:sttUpdate', { 
                         text, 
                         isFinal,
                         isListening: this.state.isListening 
@@ -193,10 +218,10 @@ class AskService {
                     console.log('[AskService] Transcribed text is empty, not submitting');
                 }
                 
-                // Send completion to the ask window
-                const askWindow = getWindowPool()?.get('ask');
-                if (askWindow && !askWindow.isDestroyed()) {
-                    askWindow.webContents.send('ask:sttComplete', { 
+                // Send completion to the target window
+                const targetWindow = this._getTargetWindow();
+                if (targetWindow && !targetWindow.isDestroyed()) {
+                    targetWindow.webContents.send('ask:sttComplete', { 
                         text,
                         isListening: false 
                     });
@@ -204,9 +229,9 @@ class AskService {
             },
             onStatusUpdate: (status) => {
                 console.log('[AskService] STT status update:', status);
-                const askWindow = getWindowPool()?.get('ask');
-                if (askWindow && !askWindow.isDestroyed()) {
-                    askWindow.webContents.send('ask:sttStatus', { status });
+                const targetWindow = this._getTargetWindow();
+                if (targetWindow && !targetWindow.isDestroyed()) {
+                    targetWindow.webContents.send('ask:sttStatus', { status });
                 }
             },
             onError: (error) => {
@@ -214,9 +239,9 @@ class AskService {
                 this.state.isListening = false;
                 this._broadcastState();
                 
-                const askWindow = getWindowPool()?.get('ask');
-                if (askWindow && !askWindow.isDestroyed()) {
-                    askWindow.webContents.send('ask:sttError', { 
+                const targetWindow = this._getTargetWindow();
+                if (targetWindow && !targetWindow.isDestroyed()) {
+                    targetWindow.webContents.send('ask:sttError', { 
                         error: error.message || 'Speech recognition error',
                         isListening: false 
                     });
@@ -226,17 +251,17 @@ class AskService {
     }
 
     _broadcastState() {
-        const askWindow = getWindowPool()?.get('ask');
-        if (askWindow && !askWindow.isDestroyed()) {
-            askWindow.webContents.send('ask:stateUpdate', this.state);
+        const targetWindow = this._getTargetWindow();
+        if (targetWindow && !targetWindow.isDestroyed()) {
+            targetWindow.webContents.send('ask:stateUpdate', this.state);
         }
     }
 
     async toggleAskButton(inputScreenOnly = false) {
-        const askWindow = getWindowPool()?.get('ask');
+        const targetWindow = this._getTargetWindow();
 
         let shouldSendScreenOnly = false;
-        if (inputScreenOnly && this.state.showTextInput && askWindow && askWindow.isVisible()) {
+        if (inputScreenOnly && this.state.showTextInput && targetWindow && targetWindow.isVisible()) {
             shouldSendScreenOnly = true;
             await this.sendMessage('', []);
             return;
@@ -244,22 +269,40 @@ class AskService {
 
         const hasContent = this.state.isLoading || this.state.isStreaming || (this.state.currentResponse && this.state.currentResponse.length > 0);
 
-        if (askWindow && askWindow.isVisible() && hasContent) {
+        if (targetWindow && targetWindow.isVisible() && hasContent) {
             // When ask button is clicked and there's content, toggle the input bar
             this.state.showTextInput = !this.state.showTextInput;
             this._broadcastState();
         } else {
-            if (askWindow && askWindow.isVisible()) {
-                internalBridge.emit('window:requestVisibility', { name: 'ask', visible: false });
-                this.state.isVisible = false;
+            // Check if we're in sidebar mode (header window is the target)
+            const windowPool = getWindowPool();
+            const headerWindow = windowPool?.get('header');
+            const askWindow = windowPool?.get('ask');
+            const isSidebarMode = headerWindow && (!askWindow || !askWindow.isVisible());
+            
+            if (isSidebarMode) {
+                // In sidebar mode: toggle sidebar visibility
+                console.log('[AskService] Sidebar mode detected, managing header window');
+                if (headerWindow && headerWindow.isVisible()) {
+                    // Sidebar is open, just ensure input is shown
+                    this.state.showTextInput = true;
+                    this.state.isVisible = true;
+                    this._broadcastState();
+                }
             } else {
-                console.log('[AskService] Showing hidden Ask window');
-                internalBridge.emit('window:requestVisibility', { name: 'ask', visible: true });
-                this.state.isVisible = true;
-            }
-            if (this.state.isVisible) {
-                this.state.showTextInput = true;
-                this._broadcastState();
+                // Standalone ask window mode
+                if (targetWindow && targetWindow.isVisible()) {
+                    internalBridge.emit('window:requestVisibility', { name: 'ask', visible: false });
+                    this.state.isVisible = false;
+                } else {
+                    console.log('[AskService] Showing hidden Ask window');
+                    internalBridge.emit('window:requestVisibility', { name: 'ask', visible: true });
+                    this.state.isVisible = true;
+                }
+                if (this.state.isVisible) {
+                    this.state.showTextInput = true;
+                    this._broadcastState();
+                }
             }
         }
     }
@@ -313,7 +356,14 @@ class AskService {
      * @returns {Promise<{success: boolean, response?: string, error?: string}>}
      */
     async sendMessage(userPrompt, conversationHistoryRaw=[]) {
-        internalBridge.emit('window:requestVisibility', { name: 'ask', visible: true });
+        // Don't force ask window visibility - messages go to sidebar if header is active
+        // Only show ask window if no target window is available
+        const targetWindow = this._getTargetWindow();
+        if (!targetWindow) {
+            console.log('[AskService] No target window available, requesting ask window visibility');
+            internalBridge.emit('window:requestVisibility', { name: 'ask', visible: true });
+        }
+        
         this.state = {
             ...this.state,
             isLoading: true,
@@ -400,12 +450,12 @@ class AskService {
 
             try {
                 const response = await streamingLLM.streamChat(messages);
-                const askWin = getWindowPool()?.get('ask');
+                const targetWindow = this._getTargetWindow();
 
-                if (!askWin || askWin.isDestroyed()) {
-                    console.error("[AskService] Ask window is not available to send stream to.");
+                if (!targetWindow || targetWindow.isDestroyed()) {
+                    console.error("[AskService] Target window is not available to send stream to.");
                     response.body.getReader().cancel();
-                    return { success: false, error: 'Ask window is not available.' };
+                    return { success: false, error: 'Target window is not available.' };
                 }
 
                 const reader = response.body.getReader();
@@ -414,7 +464,7 @@ class AskService {
                     reader.cancel(signal.reason).catch(() => { /* 이미 취소된 경우의 오류는 무시 */ });
                 });
 
-                await this._processStream(reader, askWin, sessionId, signal);
+                await this._processStream(reader, targetWindow, sessionId, signal);
                 
                 // Handle parallel conversational response if it was started
                 if (conversationalPromise) {
@@ -426,9 +476,9 @@ class AskService {
                             
                             console.log('[AskService] Generated parallel conversational response for TTS');
                             
-                            // Send conversational response to ask window for TTS
-                            if (askWin && !askWin.isDestroyed()) {
-                                askWin.webContents.send('ask:conversationalResponse', {
+                            // Send conversational response to target window for TTS
+                            if (targetWindow && !targetWindow.isDestroyed()) {
+                                targetWindow.webContents.send('ask:conversationalResponse', {
                                     text: conversationalResponse,
                                     originalResponse: this.state.currentResponse
                                 });
@@ -456,12 +506,12 @@ class AskService {
                     ];
 
                     const fallbackResponse = await streamingLLM.streamChat(textOnlyMessages);
-                    const askWin = getWindowPool()?.get('ask');
+                    const fallbackWindow = this._getTargetWindow();
 
-                    if (!askWin || askWin.isDestroyed()) {
-                        console.error("[AskService] Ask window is not available for fallback response.");
+                    if (!fallbackWindow || fallbackWindow.isDestroyed()) {
+                        console.error("[AskService] Target window is not available for fallback response.");
                         fallbackResponse.body.getReader().cancel();
-                        return { success: false, error: 'Ask window is not available.' };
+                        return { success: false, error: 'Target window is not available.' };
                     }
 
                     const fallbackReader = fallbackResponse.body.getReader();
@@ -470,7 +520,7 @@ class AskService {
                         fallbackReader.cancel(signal.reason).catch(() => {});
                     });
 
-                    await this._processStream(fallbackReader, askWin, sessionId, signal);
+                    await this._processStream(fallbackReader, fallbackWindow, sessionId, signal);
                     return { success: true };
                 } else {
                     // 다른 종류의 에러이거나 스크린샷이 없었다면 그대로 throw
@@ -488,10 +538,10 @@ class AskService {
             };
             this._broadcastState();
 
-            const askWin = getWindowPool()?.get('ask');
-            if (askWin && !askWin.isDestroyed()) {
+            const targetWindow = this._getTargetWindow();
+            if (targetWindow && !targetWindow.isDestroyed()) {
                 const streamError = error.message || 'Unknown error occurred';
-                askWin.webContents.send('ask-response-stream-error', { error: streamError });
+                targetWindow.webContents.send('ask-response-stream-error', { error: streamError });
             }
 
             return { success: false, error: error.message };
@@ -768,9 +818,9 @@ Conversational response:`;
                                 if (this._isSentenceComplete(sentenceBuffer)) {
                                     console.log(`[AskService] Sending TTS chunk: "${sentenceBuffer.trim()}"`);
                                     // Send chunk immediately for TTS
-                                    const askWin = getWindowPool()?.get('ask');
-                                    if (askWin && !askWin.isDestroyed()) {
-                                        askWin.webContents.send('ask:conversationalChunk', {
+                                    const targetWindow = this._getTargetWindow();
+                                    if (targetWindow && !targetWindow.isDestroyed()) {
+                                        targetWindow.webContents.send('ask:conversationalChunk', {
                                             text: sentenceBuffer.trim(),
                                             isComplete: false,
                                             timestamp: Date.now()
@@ -789,9 +839,9 @@ Conversational response:`;
             // Send any remaining text as final chunk
             if (sentenceBuffer.trim()) {
                 console.log(`[AskService] Sending final TTS chunk: "${sentenceBuffer.trim()}"`);
-                const askWin = getWindowPool()?.get('ask');
-                if (askWin && !askWin.isDestroyed()) {
-                    askWin.webContents.send('ask:conversationalChunk', {
+                const targetWindow = this._getTargetWindow();
+                if (targetWindow && !targetWindow.isDestroyed()) {
+                    targetWindow.webContents.send('ask:conversationalChunk', {
                         text: sentenceBuffer.trim(),
                         isComplete: true,
                         timestamp: Date.now()
@@ -841,6 +891,46 @@ Conversational response:`;
             return await this.stopVoiceInput();
         } else {
             return await this.startVoiceInput();
+        }
+    }
+
+    /**
+     * Load conversation history from database for the current session
+     * @returns {Promise<{success: boolean, conversationHistory?: Array, error?: string}>}
+     */
+    async loadConversationHistory() {
+        try {
+            console.log('[AskService] Loading conversation history...');
+            
+            // Get or create active session
+            const sessionId = await sessionRepository.getOrCreateActive('ask');
+            
+            // Retrieve all messages for this session
+            const messages = await askRepository.getAllAiMessagesBySessionId(sessionId);
+            
+            console.log(`[AskService] Loaded ${messages.length} messages from session ${sessionId}`);
+            
+            // Convert database messages to conversation format
+            const conversationHistory = messages.map(msg => ({
+                id: msg.id,
+                role: msg.role,
+                content: msg.content,
+                timestamp: msg.sent_at * 1000, // Convert to milliseconds
+                model: msg.model
+            }));
+            
+            return {
+                success: true,
+                conversationHistory,
+                sessionId
+            };
+        } catch (error) {
+            console.error('[AskService] Error loading conversation history:', error);
+            return {
+                success: false,
+                error: error.message,
+                conversationHistory: []
+            };
         }
     }
 

@@ -124,6 +124,8 @@ contextBridge.exposeInMainWorld('api', {
     // Listeners
     onListenChangeSessionResult: (callback) => ipcRenderer.on('listen:changeSessionResult', callback),
     removeOnListenChangeSessionResult: (callback) => ipcRenderer.removeListener('listen:changeSessionResult', callback),
+    onResearchVisibilityChanged: (callback) => ipcRenderer.on('research:visibilityChanged', callback),
+    removeOnResearchVisibilityChanged: (callback) => ipcRenderer.removeListener('research:visibilityChanged', callback),
     onShortcutsUpdated: (callback) => ipcRenderer.on('shortcuts-updated', callback),
     removeOnShortcutsUpdated: (callback) => ipcRenderer.removeListener('shortcuts-updated', callback)
   },
@@ -162,6 +164,7 @@ contextBridge.exposeInMainWorld('api', {
     toggleVoiceInput: () => ipcRenderer.invoke('ask:toggleVoiceInput'),
     sendAudioData: (data, mimeType) => ipcRenderer.invoke('ask:sendAudioData', { data, mimeType }),
     transcribeAudioDirect: (data, mimeType) => ipcRenderer.invoke('ask:transcribeAudioDirect', { data, mimeType }),
+    loadConversationHistory: () => ipcRenderer.invoke('ask:loadConversationHistory'),
 
     // Listeners
     onAskStateUpdate: (callback) => ipcRenderer.on('ask:stateUpdate', callback),

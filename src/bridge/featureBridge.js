@@ -89,6 +89,7 @@ module.exports = {
     ipcMain.handle('ask:toggleVoiceInput', async () => await askService.toggleVoiceInput());
     ipcMain.handle('ask:sendAudioData', async (event, { data, mimeType }) => await askService.sendAudioData(data, mimeType));
     ipcMain.handle('ask:transcribeAudioDirect', async (event, { data, mimeType }) => await askService.transcribeAudioDirect(data, mimeType));
+    ipcMain.handle('ask:loadConversationHistory', async () => await askService.loadConversationHistory());
     
     // Research
     ipcMain.handle('research:toggleResearchView', async () => {
@@ -112,11 +113,11 @@ module.exports = {
     ipcMain.handle('listen:changeSession', async (event, listenButtonText) => {
       console.log('[FeatureBridge] listen:changeSession from mainheader', listenButtonText);
       try {
-        await listenService.handleListenRequest(listenButtonText);
-        return { success: true };
+        const result = await listenService.handleListenRequest(listenButtonText);
+        return result; // Returns { success: true, state: newState }
       } catch (error) {
         console.error('[FeatureBridge] listen:changeSession failed', error.message);
-        return { success: false, error: error.message };
+        return { success: false, error: error.message, state: listenButtonText };
       }
     });
 

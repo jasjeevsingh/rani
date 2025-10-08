@@ -240,8 +240,8 @@ class HeaderTransitionManager {
     async _resizeForMain() {
     if (!window.api) return;
     // Use full sidebar height (e.g., 800px or window.screen.availHeight)
-    const sidebarWidth = 81; 
-    const sidebarHeight = 90; // You can adjust this value as needed
+    const sidebarWidth = 80; 
+    const sidebarHeight = 162; // You can adjust this value as needed
     console.log(`[HeaderController] _resizeForMain: Resizing window to ${sidebarWidth}x${sidebarHeight}`);
     return window.api.headerController.resizeHeaderWindow({ width: sidebarWidth, height: sidebarHeight }).catch(() => {});
     }
