@@ -131,6 +131,21 @@ const LATEST_SCHEMA = {
             { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
         ]
     },
+    document_chunks: {
+        columns: [
+            { name: 'id', type: 'TEXT PRIMARY KEY' },
+            { name: 'document_id', type: 'TEXT NOT NULL' },
+            { name: 'chunk_index', type: 'INTEGER NOT NULL' },
+            { name: 'content', type: 'TEXT NOT NULL' },
+            { name: 'content_length', type: 'INTEGER' },
+            { name: 'token_count', type: 'INTEGER' },
+            { name: 'embedding', type: 'BLOB' },
+            { name: 'metadata', type: 'TEXT' },
+            { name: 'created_at', type: 'INTEGER' },
+            { name: 'updated_at', type: 'INTEGER' },
+            { name: 'sync_state', type: 'TEXT DEFAULT \'pending\'' }
+        ]
+    },
     annotations: {
         columns: [
             { name: 'id', type: 'TEXT PRIMARY KEY' },

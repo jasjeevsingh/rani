@@ -4,6 +4,8 @@ const { createStreamingLLM } = require('../common/ai/factory');
 const getWindowManager = () => require('../../window/windowManager');
 const internalBridge = require('../../bridge/internalBridge');
 const AskSttService = require('./stt/askSttService');
+const sqliteClient = require('../common/services/sqliteClient');
+const DocumentRetrievalService = require('../documents/documentRetrievalService');
 
 const getWindowPool = () => {
     try {
@@ -148,6 +150,7 @@ class AskService {
             showTextInput: true,
             isListening: false,
             sttTranscription: '',
+            retrievalResults: []
         };
         
         // Initialize STT service
@@ -158,6 +161,8 @@ class AskService {
         this.sttService = new AskSttService();
         this.setupSttCallbacks();
         
+        this.retrievalService = new DocumentRetrievalService(sqliteClient);
+
         console.log('[AskService] Service instance created.');
     }
 
@@ -328,6 +333,7 @@ class AskService {
                 showTextInput  : true,
                 isListening    : false,
                 sttTranscription: '',
+                retrievalResults: []
             };
             this._broadcastState();
     
@@ -371,6 +377,7 @@ class AskService {
             currentQuestion: userPrompt,
             currentResponse: '',
             showTextInput: true,  // Keep input bar visible during processing
+            retrievalResults: []
         };
         this._broadcastState();
 
@@ -402,6 +409,27 @@ class AskService {
                 console.log(`[AskService] Retrieved ${conversationHistoryRaw.length} messages from conversation history`);
             }
             
+            let retrievedChunks = [];
+            try {
+                console.log(`[AskService:RAG] Searching document chunks for query: "${userPrompt.substring(0, 80)}"`);
+                const retrievalResult = await this.retrievalService.search({
+                    query: userPrompt,
+                    limit: 5
+                });
+                if (retrievalResult.success) {
+                    retrievedChunks = retrievalResult.results;
+                    console.log(`[AskService:RAG] Retrieved ${retrievedChunks.length} chunks (provider=${retrievalResult.provider}, model=${retrievalResult.model})`);
+                    this.state.retrievalResults = retrievedChunks;
+                    this._broadcastState();
+                } else {
+                    console.warn(`[AskService:RAG] Retrieval skipped: ${retrievalResult.reason}`);
+                    this.state.retrievalResults = [];
+                }
+            } catch (retrievalError) {
+                console.error('[AskService:RAG] Retrieval failed:', retrievalError);
+                this.state.retrievalResults = [];
+            }
+
             const modelInfo = await modelStateService.getCurrentModelInfo('llm');
             if (!modelInfo || !modelInfo.apiKey) {
                 throw new Error('AI model or API key not configured.');
@@ -437,6 +465,12 @@ class AskService {
                     type: 'image_url',
                     image_url: { url: `data:image/jpeg;base64,${screenshotBase64}` },
                 });
+            }
+
+            const retrievalContextMessage = this.buildRetrievedContextMessage(retrievedChunks);
+            if (retrievalContextMessage) {
+                console.log(`[AskService:RAG] Injecting retrieval context into prompt (${retrievedChunks.length} chunks).`);
+                messages.splice(1, 0, { role: 'system', content: retrievalContextMessage });
             }
             
             const streamingLLM = createStreamingLLM(modelInfo.provider, {
@@ -504,6 +538,10 @@ class AskService {
                             content: `User Request: ${userPrompt.trim()}`
                         }
                     ];
+
+                    if (retrievalContextMessage) {
+                        textOnlyMessages.splice(1, 0, { role: 'system', content: retrievalContextMessage });
+                    }
 
                     const fallbackResponse = await streamingLLM.streamChat(textOnlyMessages);
                     const fallbackWindow = this._getTargetWindow();
@@ -855,6 +893,27 @@ Conversational response:`;
             // Fallback: return a simple response
             return `I'll help you with that.`;
         }
+    }
+
+    /**
+     * Build RAG context message for the LLM
+     */
+    buildRetrievedContextMessage(chunks = []) {
+        if (!Array.isArray(chunks) || chunks.length === 0) {
+            return null;
+        }
+
+        const blocks = chunks.map((chunk, index) => {
+            const metadata = chunk.metadata || {};
+            const title = metadata.title || metadata.filename || `Document ${chunk.documentId}`;
+            const snippet = (chunk.content || '').trim().slice(0, 800);
+            const suffix = chunk.content && chunk.content.length > 800 ? '…' : '';
+            const location = metadata.startOffset != null ? ` (offset ${metadata.startOffset})` : '';
+            const score = typeof chunk.score === 'number' ? ` [score: ${chunk.score.toFixed(2)}]` : '';
+            return `Source ${index + 1}: ${title}${location}${score}\n${snippet}${suffix}`;
+        });
+
+        return `Use the following context from the user's documents when formulating your response. Do not quote if irrelevant.\n\n${blocks.join('\n\n')}`;
     }
 
     /**

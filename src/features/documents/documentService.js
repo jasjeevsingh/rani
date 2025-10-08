@@ -1,6 +1,8 @@
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+const DocumentChunkService = require('./documentChunkService');
+const DocumentEmbeddingService = require('./documentEmbeddingService');
 
 /**
  * Document Service for RANI
@@ -11,6 +13,8 @@ class DocumentService {
         this.db = databaseClient;
         this.userDir = userDir;
         this.documentsDir = path.join(userDir, 'documents');
+        this.chunkService = new DocumentChunkService(databaseClient);
+        this.embeddingService = new DocumentEmbeddingService(databaseClient);
         
         // Initialize directories without awaiting in constructor
         this.ensureDirectories().catch(error => {
@@ -114,6 +118,24 @@ class DocumentService {
             
             console.log(`[DocumentService] Successfully processed document: ${originalName} (${documentId})`);
             
+            let chunkCount = 0;
+            let embeddingSummary = { success: false, processed: 0, skipped: true, reason: 'not-run' };
+            try {
+                chunkCount = this.chunkService.rebuildDocumentChunks(document);
+                console.log(`[DocumentService] Generated ${chunkCount} text chunks for document ${documentId}`);
+            } catch (chunkError) {
+                console.error('[DocumentService] Failed to generate document chunks:', chunkError);
+            }
+
+            if (chunkCount > 0) {
+                try {
+                    embeddingSummary = await this.embeddingService.embedDocument(documentId, { limit: chunkCount });
+                    console.log('[DocumentService] Embedding summary:', embeddingSummary);
+                } catch (embeddingError) {
+                    console.error('[DocumentService] Failed to generate embeddings:', embeddingError);
+                }
+            }
+
             return {
                 id: documentId,
                 filename: originalName,
@@ -121,7 +143,9 @@ class DocumentService {
                 fileSize: fileStats.size,
                 uploadedAt: document.uploaded_at,
                 hasText: extractedText.length > 0,
-                metadata
+                metadata,
+                chunkCount,
+                embedding: embeddingSummary
             };
         } catch (error) {
             console.error('[DocumentService] Failed to process document:', error);
@@ -297,6 +321,13 @@ This PDF document could not be processed for text extraction. The file may be en
             // Delete associated annotations
             const deleteAnnotationsQuery = `DELETE FROM annotations WHERE document_id = ?`;
             this.db.getDb().prepare(deleteAnnotationsQuery).run(documentId);
+
+            // Delete document chunks
+            try {
+                this.chunkService.deleteChunks(documentId);
+            } catch (error) {
+                console.warn('[DocumentService] Failed to delete document chunks:', error.message);
+            }
             
             console.log(`[DocumentService] Successfully deleted document: ${documentId}`);
             return true;

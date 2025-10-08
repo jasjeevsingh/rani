@@ -27,6 +27,10 @@ const PROVIDERS = {
       sttModels: [
           { id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe' }
       ],
+      embeddingModels: [
+          { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small' },
+          { id: 'text-embedding-3-large', name: 'Text Embedding 3 Large' }
+      ],
   },
 
   'openai-glass': {
@@ -38,6 +42,9 @@ const PROVIDERS = {
       sttModels: [
           { id: 'gpt-4o-mini-transcribe-glass', name: 'GPT-4o Mini Transcribe (glass)' }
       ],
+      embeddingModels: [
+          { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small' }
+      ],
   },
   'gemini': {
       name: 'Gemini',
@@ -48,6 +55,7 @@ const PROVIDERS = {
       sttModels: [
           { id: 'gemini-live-2.5-flash-preview', name: 'Gemini Live 2.5 Flash' }
       ],
+      embeddingModels: [],
   },
   'anthropic': {
       name: 'Anthropic',
@@ -56,6 +64,7 @@ const PROVIDERS = {
           { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
       ],
       sttModels: [],
+      embeddingModels: [],
   },
   'deepgram': {
     name: 'Deepgram',
@@ -64,12 +73,14 @@ const PROVIDERS = {
     sttModels: [
         { id: 'nova-3', name: 'Nova-3 (General)' },
         ],
+    embeddingModels: [],
     },
   'ollama': {
       name: 'Ollama (Local)',
       handler: () => require("./providers/ollama"),
       llmModels: [], // Dynamic models populated from installed Ollama models
       sttModels: [], // Ollama doesn't support STT yet
+      embeddingModels: [],
   },
   'whisper': {
       name: 'Whisper (Local)',
@@ -92,6 +103,7 @@ const PROVIDERS = {
           { id: 'whisper-small', name: 'Whisper Small (244M)' },
           { id: 'whisper-medium', name: 'Whisper Medium (769M)' },
       ],
+      embeddingModels: [],
   },
 };
 
@@ -138,6 +150,19 @@ function createStreamingLLM(provider, opts) {
   return handler.createStreamingLLM(opts);
 }
 
+function createEmbeddingClient(provider, opts) {
+  if (provider === 'openai-glass') provider = 'openai';
+
+  const handler = PROVIDERS[provider]?.handler();
+  if (!handler?.createEmbeddingClient) {
+      throw new Error(`Embeddings not supported for provider: ${provider}`);
+  }
+  if (opts && opts.model) {
+    opts = { ...opts, model: sanitizeModelId(opts.model) };
+  }
+  return handler.createEmbeddingClient(opts);
+}
+
 function getProviderClass(providerId) {
     const providerConfig = PROVIDERS[providerId];
     if (!providerConfig) return null;
@@ -168,11 +193,13 @@ function getProviderClass(providerId) {
 function getAvailableProviders() {
   const stt = [];
   const llm = [];
+  const embedding = [];
   for (const [id, provider] of Object.entries(PROVIDERS)) {
       if (provider.sttModels.length > 0) stt.push(id);
       if (provider.llmModels.length > 0) llm.push(id);
+      if (provider.embeddingModels && provider.embeddingModels.length > 0) embedding.push(id);
   }
-  return { stt: [...new Set(stt)], llm: [...new Set(llm)] };
+  return { stt: [...new Set(stt)], llm: [...new Set(llm)], embedding: [...new Set(embedding)] };
 }
 
 module.exports = {
@@ -180,6 +207,7 @@ module.exports = {
   createSTT,
   createLLM,
   createStreamingLLM,
+  createEmbeddingClient,
   getProviderClass,
   getAvailableProviders,
 };
