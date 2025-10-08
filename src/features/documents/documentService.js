@@ -1,6 +1,8 @@
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+const DocumentChunkService = require('./documentChunkService');
+const DocumentEmbeddingService = require('./documentEmbeddingService');
 
 /**
  * Document Service for RANI
@@ -11,6 +13,8 @@ class DocumentService {
         this.db = databaseClient;
         this.userDir = userDir;
         this.documentsDir = path.join(userDir, 'documents');
+        this.chunkService = new DocumentChunkService(databaseClient);
+        this.embeddingService = new DocumentEmbeddingService(databaseClient);
         
         // Initialize directories without awaiting in constructor
         this.ensureDirectories().catch(error => {
@@ -23,6 +27,41 @@ class DocumentService {
             await fs.mkdir(this.documentsDir, { recursive: true });
         } catch (error) {
             console.error('[DocumentService] Failed to create documents directory:', error);
+        }
+    }
+
+    /**
+     * Import a document by delegating to processDocument and merging extra metadata
+     */
+    async importDocument(filePath, userId, metadata = {}) {
+        try {
+            if (!filePath) {
+                throw new Error('filePath is required');
+            }
+
+            const originalName = (metadata && (metadata.originalName || metadata.filename)) || path.basename(filePath);
+            const extraMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : {};
+
+            delete extraMetadata.originalName;
+            delete extraMetadata.filename;
+
+            const document = await this.processDocument(filePath, originalName, userId);
+
+            if (extraMetadata && Object.keys(extraMetadata).length > 0) {
+                const mergedMetadata = {
+                    ...(document.metadata || {}),
+                    ...extraMetadata
+                };
+
+                const updateQuery = `UPDATE documents SET metadata = ? WHERE id = ?`;
+                this.db.getDb().prepare(updateQuery).run(JSON.stringify(mergedMetadata), document.id);
+                document.metadata = mergedMetadata;
+            }
+
+            return document;
+        } catch (error) {
+            console.error('[DocumentService] Failed to import document:', error);
+            throw error;
         }
     }
 
@@ -79,6 +118,24 @@ class DocumentService {
             
             console.log(`[DocumentService] Successfully processed document: ${originalName} (${documentId})`);
             
+            let chunkCount = 0;
+            let embeddingSummary = { success: false, processed: 0, skipped: true, reason: 'not-run' };
+            try {
+                chunkCount = this.chunkService.rebuildDocumentChunks(document);
+                console.log(`[DocumentService] Generated ${chunkCount} text chunks for document ${documentId}`);
+            } catch (chunkError) {
+                console.error('[DocumentService] Failed to generate document chunks:', chunkError);
+            }
+
+            if (chunkCount > 0) {
+                try {
+                    embeddingSummary = await this.embeddingService.embedDocument(documentId, { limit: chunkCount });
+                    console.log('[DocumentService] Embedding summary:', embeddingSummary);
+                } catch (embeddingError) {
+                    console.error('[DocumentService] Failed to generate embeddings:', embeddingError);
+                }
+            }
+
             return {
                 id: documentId,
                 filename: originalName,
@@ -86,7 +143,9 @@ class DocumentService {
                 fileSize: fileStats.size,
                 uploadedAt: document.uploaded_at,
                 hasText: extractedText.length > 0,
-                metadata
+                metadata,
+                chunkCount,
+                embedding: embeddingSummary
             };
         } catch (error) {
             console.error('[DocumentService] Failed to process document:', error);
@@ -140,6 +199,8 @@ This document contains PDF content that would be extracted and made searchable.`
             
             console.log(`[DocumentService] Successfully extracted ${extractedText.length} characters from ${pageCount} pages`);
             
+            const creationDate = this.parsePdfCreationDate(pdfInfo.CreationDate);
+
             // Create structured metadata
             const metadata = {
                 pages: pageCount,
@@ -147,7 +208,7 @@ This document contains PDF content that would be extracted and made searchable.`
                 author: pdfInfo.Author || '',
                 subject: pdfInfo.Subject || '',
                 creator: pdfInfo.Creator || '',
-                creationDate: pdfInfo.CreationDate ? new Date(pdfInfo.CreationDate) : null,
+                creationDate,
                 keywords: pdfInfo.Keywords || '',
                 extractedAt: new Date().toISOString()
             };
@@ -158,7 +219,7 @@ This document contains PDF content that would be extracted and made searchable.`
                 metadata.author ? `Author: ${metadata.author}` : '',
                 metadata.subject ? `Subject: ${metadata.subject}` : '',
                 `Pages: ${pageCount}`,
-                metadata.creationDate ? `Created: ${metadata.creationDate.toISOString()}` : '',
+                metadata.creationDate ? `Created: ${metadata.creationDate}` : '',
                 '--- Content ---',
                 extractedText
             ].filter(line => line).join('\n\n');
@@ -260,6 +321,13 @@ This PDF document could not be processed for text extraction. The file may be en
             // Delete associated annotations
             const deleteAnnotationsQuery = `DELETE FROM annotations WHERE document_id = ?`;
             this.db.getDb().prepare(deleteAnnotationsQuery).run(documentId);
+
+            // Delete document chunks
+            try {
+                this.chunkService.deleteChunks(documentId);
+            } catch (error) {
+                console.warn('[DocumentService] Failed to delete document chunks:', error.message);
+            }
             
             console.log(`[DocumentService] Successfully deleted document: ${documentId}`);
             return true;
@@ -324,6 +392,50 @@ This PDF document could not be processed for text extraction. The file may be en
             document.file_path, document.file_size, document.extracted_text,
             document.metadata, document.uploaded_at, document.sync_state
         );
+    }
+
+    /**
+     * Normalize PDF creation date strings into ISO format when possible
+     */
+    parsePdfCreationDate(rawValue) {
+        if (!rawValue || typeof rawValue !== 'string') {
+            return null;
+        }
+
+        const trimmed = rawValue.startsWith('D:') ? rawValue.slice(2) : rawValue;
+        const dateMatch = trimmed.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
+
+        if (!dateMatch) {
+            const fallback = new Date(rawValue);
+            return Number.isNaN(fallback.getTime()) ? rawValue : fallback.toISOString();
+        }
+
+        const [, year, month, day, hour, minute, second] = dateMatch;
+        let offset = 'Z';
+
+        if (/Z$/.test(trimmed)) {
+            offset = 'Z';
+        } else {
+            const offsetMatch = trimmed.match(/([+-])(\d{2})'?(\d{2})'?/);
+            if (offsetMatch) {
+                const [, sign, hours, minutesRaw] = offsetMatch;
+                const minutes = minutesRaw && minutesRaw.length ? minutesRaw : '00';
+                offset = `${sign}${hours}:${minutes}`;
+            }
+        }
+
+        const candidate = `${year}-${month}-${day}T${hour}:${minute}:${second}${offset}`;
+        const parsed = new Date(candidate);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString();
+        }
+
+        const fallback = new Date(rawValue);
+        if (!Number.isNaN(fallback.getTime())) {
+            return fallback.toISOString();
+        }
+
+        return rawValue;
     }
 
     /**

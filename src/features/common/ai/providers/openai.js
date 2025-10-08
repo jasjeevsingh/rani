@@ -300,9 +300,33 @@ function createStreamingLLM({ apiKey, model = 'gpt-4o', temperature = 0.7, maxTo
   };
 }
 
+function createEmbeddingClient({ apiKey, model = 'text-embedding-3-small' }) {
+  if (!apiKey) {
+      throw new Error('OpenAI embedding client requires an API key.');
+  }
+
+  const client = new OpenAI({ apiKey });
+
+  return {
+      embedTexts: async (texts) => {
+          if (!Array.isArray(texts) || texts.length === 0) {
+              return [];
+          }
+
+          const response = await client.embeddings.create({
+              model,
+              input: texts
+          });
+
+          return response.data.map(item => item.embedding);
+      }
+  };
+}
+
 module.exports = {
     OpenAIProvider,
     createSTT,
     createLLM,
-    createStreamingLLM
+    createStreamingLLM,
+    createEmbeddingClient
 }; 

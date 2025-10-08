@@ -20,6 +20,7 @@ export class AskView extends LitElement {
         voiceActivity: { type: Boolean },
         conversationalResponse: { type: String },
         conversationHistory: { type: Array },
+        retrievalResults: { type: Array },
         embedded: { type: Boolean }, // New: Embedded mode flag for sidebar
     };
 
@@ -920,6 +921,63 @@ export class AskView extends LitElement {
             position: relative;
         }
 
+        .retrieval-context {
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            backdrop-filter: blur(18px);
+        }
+
+        .retrieval-context__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 0.5rem;
+        }
+
+        .retrieval-context__list {
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .retrieval-context__item {
+            padding: 0.5rem 0.6rem;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .retrieval-context__title {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 0.35rem;
+        }
+
+        .retrieval-context__score {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .retrieval-context__body {
+            font-size: 0.82rem;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.78);
+            display: -webkit-box;
+            -webkit-line-clamp: 5;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            white-space: pre-wrap;
+        }
+
         .conversation-container::-webkit-scrollbar {
             width: 6px;
         }
@@ -1031,6 +1089,7 @@ export class AskView extends LitElement {
         this.conversationHistory = [];
         this.conversationHistoryLoaded = false; // Flag to prevent duplicate loading
         this.embedded = false; // Default to standalone mode
+        this.retrievalResults = [];
 
         // TTS chunking state
         this.isChunkedTTSActive = false;
@@ -1151,6 +1210,7 @@ export class AskView extends LitElement {
                 // Always update these non-reactive properties
                 this.sttTranscription = newState.sttTranscription || '';
                 this.conversationalResponse = newState.conversationalResponse || '';
+                this.retrievalResults = Array.isArray(newState.retrievalResults) ? newState.retrievalResults : [];
                 
                 // Debug streaming state changes
                 if (this.focusLock && (stateChanged.streaming || stateChanged.loading)) {
@@ -2904,7 +2964,7 @@ export class AskView extends LitElement {
     render() {
         const hasResponse = this.isLoading || this.currentResponse || this.isStreaming;
         const headerText = this.isLoading ? 'Thinking...' : 'AI Response';
-        const hasConversation = this.conversationHistory.length > 0 || hasResponse;
+        const hasConversation = this.conversationHistory.length > 0 || hasResponse || (this.retrievalResults && this.retrievalResults.length > 0);
 
         // Only show current response if it's not already in conversation history
         const shouldShowCurrentResponse = hasResponse && (
@@ -2957,6 +3017,7 @@ export class AskView extends LitElement {
 
                 <!-- Unified Conversation Container -->
                 <div class="conversation-container ${!hasConversation ? 'hidden' : ''}" id="conversationContainer">
+                    ${this.renderRetrievalContext()}
                     <!-- Conversation History -->
                     ${(() => {
                         return this.conversationHistory.map((message, index) => html`
@@ -3031,6 +3092,43 @@ export class AskView extends LitElement {
                             </span>
                         </button>
                     </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderRetrievalContext() {
+        if (!this.retrievalResults || this.retrievalResults.length === 0) {
+            return null;
+        }
+
+        const items = this.retrievalResults.slice(0, 5);
+        const total = this.retrievalResults.length;
+
+        return html`
+            <div class="retrieval-context">
+                <div class="retrieval-context__header">
+                    <span>Document Context</span>
+                    <span>${total}</span>
+                </div>
+                <div class="retrieval-context__list">
+                    ${items.map((chunk, index) => {
+                        const metadata = chunk.metadata || {};
+                        const title = metadata.title || metadata.filename || `Source ${index + 1}`;
+                        const score = typeof chunk.score === 'number' ? chunk.score : null;
+                        const body = (chunk.content || '').trim();
+                        const displayBody = body.length > 400 ? `${body.slice(0, 400)}…` : body;
+
+                        return html`
+                            <div class="retrieval-context__item">
+                                <div class="retrieval-context__title">
+                                    <span>${index + 1}. ${title}</span>
+                                    ${score !== null ? html`<span class="retrieval-context__score">${score.toFixed(2)}</span>` : ''}
+                                </div>
+                                <div class="retrieval-context__body">${displayBody}</div>
+                            </div>
+                        `;
+                    })}
                 </div>
             </div>
         `;
