@@ -1090,6 +1090,8 @@ export class AskView extends LitElement {
         this.conversationHistoryLoaded = false; // Flag to prevent duplicate loading
         this.embedded = false; // Default to standalone mode
         this.retrievalResults = [];
+        this._prevConversationScrollTop = null;
+        this._wasNearBottomBeforeRetrieval = true;
 
         // TTS chunking state
         this.isChunkedTTSActive = false;
@@ -2918,6 +2920,20 @@ export class AskView extends LitElement {
         }
     }
 
+    willUpdate(changedProperties) {
+        if (changedProperties.has('retrievalResults')) {
+            const conversationContainer = this.shadowRoot?.querySelector('.conversation-container');
+            if (conversationContainer) {
+                this._prevConversationScrollTop = conversationContainer.scrollTop;
+                const distanceFromBottom = conversationContainer.scrollHeight - (conversationContainer.scrollTop + conversationContainer.clientHeight);
+                this._wasNearBottomBeforeRetrieval = distanceFromBottom <= 40;
+            } else {
+                this._prevConversationScrollTop = null;
+                this._wasNearBottomBeforeRetrieval = true;
+            }
+        }
+    }
+
     updated(changedProperties) {
         super.updated(changedProperties);
     
@@ -2928,12 +2944,35 @@ export class AskView extends LitElement {
             });
         }
     
-        if (changedProperties.has('showTextInput') || changedProperties.has('isLoading') || changedProperties.has('currentResponse')) {
+        if (
+            changedProperties.has('showTextInput') ||
+            changedProperties.has('isLoading') ||
+            changedProperties.has('currentResponse') ||
+            changedProperties.has('retrievalResults')
+        ) {
             this.adjustWindowHeightThrottled();
         }
-    
+
         if (changedProperties.has('showTextInput') && this.showTextInput) {
             this.focusTextInput();
+        }
+
+        if (changedProperties.has('retrievalResults')) {
+            this.updateComplete.then(() => {
+                const conversationContainer = this.shadowRoot?.querySelector('.conversation-container');
+                if (!conversationContainer) {
+                    return;
+                }
+
+                if (this._wasNearBottomBeforeRetrieval) {
+                    conversationContainer.scrollTop = conversationContainer.scrollHeight;
+                } else if (typeof this._prevConversationScrollTop === 'number') {
+                    conversationContainer.scrollTop = this._prevConversationScrollTop;
+                }
+
+                this._prevConversationScrollTop = null;
+                this._wasNearBottomBeforeRetrieval = true;
+            });
         }
 
         // Render markdown content for assistant messages in conversation history
@@ -3102,14 +3141,15 @@ export class AskView extends LitElement {
             return null;
         }
 
-        const items = this.retrievalResults.slice(0, 5);
         const total = this.retrievalResults.length;
+        const items = this.retrievalResults.slice(0, 1);
+        const usingCount = Math.min(5, total);
 
         return html`
             <div class="retrieval-context">
                 <div class="retrieval-context__header">
                     <span>Document Context</span>
-                    <span>${total}</span>
+                    <span>Using ${usingCount}${total > 1 ? ', showing best match' : ''}</span>
                 </div>
                 <div class="retrieval-context__list">
                     ${items.map((chunk, index) => {
