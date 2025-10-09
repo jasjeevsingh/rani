@@ -104,6 +104,20 @@ class ResearchFeature {
             const userId = await this.getCurrentUserId();
             return await this.researchService.getUserPapers(userId, limit);
         });
+
+        this.ipc.handle('research:deletePaper', async (paperId) => {
+            const userId = await this.getCurrentUserId();
+            return await this.researchService.deletePaper(paperId, userId);
+        });
+
+        this.ipc.handle('research:openPaperFile', async (filePath) => {
+            const { shell } = require('electron');
+            if (filePath && require('fs').existsSync(filePath)) {
+                await shell.openPath(filePath);
+                return { success: true };
+            }
+            throw new Error('File not found');
+        });
     }
 
     /**

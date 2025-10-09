@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
@@ -15,7 +16,7 @@ class ResearchService {
         // API endpoints
         this.apis = {
             semanticScholar: 'https://api.semanticscholar.org/graph/v1',
-            arxiv: 'http://export.arxiv.org/api',
+            arxiv: 'https://export.arxiv.org/api',
             crossref: 'https://api.crossref.org/works'
         };
         
@@ -41,33 +42,34 @@ class ResearchService {
 
             console.log(`[ResearchService] Searching for papers: "${query}"`);
             
-            // For now, return mock results to test the UI
-            const mockResults = [
-                {
-                    id: 'mock-1',
-                    title: 'A Survey of Large Language Models for Research',
-                    authors: 'Smith, J., Doe, J.',
-                    abstract: 'This paper surveys the current state of large language models and their applications in research contexts.',
-                    year: 2024,
-                    venue: 'ArXiv',
-                    url: 'https://arxiv.org/abs/2401.00000',
-                    citationCount: 42,
-                    source: 'mock'
-                },
-                {
-                    id: 'mock-2',
-                    title: 'Advances in Natural Language Processing',
-                    authors: 'Johnson, A., Brown, K.',
-                    abstract: 'Recent developments in NLP have shown significant improvements in understanding and generation tasks.',
-                    year: 2023,
-                    venue: 'ACL',
-                    url: 'https://aclanthology.org/2023.acl-long.1',
-                    citationCount: 128,
-                    source: 'mock'
+            let allResults = [];
+
+            // Search arXiv
+            if (source === 'all' || source === 'arxiv') {
+                try {
+                    const arxivResults = await this.searchArxiv(query, limit);
+                    allResults = allResults.concat(arxivResults);
+                    console.log(`[ResearchService] Found ${arxivResults.length} papers from arXiv`);
+                } catch (error) {
+                    console.error('[ResearchService] arXiv search failed:', error);
+                    // Continue execution even if arXiv fails
                 }
-            ];
-            
-            return mockResults.slice(0, limit);
+            }
+
+            // Search Semantic Scholar (commented out for now)
+            // if (source === 'all' || source === 'semanticScholar') {
+            //     try {
+            //         const s2Results = await this.searchSemanticScholar(query, limit, fields);
+            //         allResults = allResults.concat(s2Results);
+            //         console.log(`[ResearchService] Found ${s2Results.length} papers from Semantic Scholar`);
+            //     } catch (error) {
+            //         console.error('[ResearchService] Semantic Scholar search failed:', error);
+            //     }
+            // }
+
+            // Deduplicate by ID and limit results
+            const uniqueResults = this.deduplicatePapers(allResults);
+            return uniqueResults.slice(0, limit);
             
         } catch (error) {
             console.error('[ResearchService] Failed to search papers:', error);
@@ -161,9 +163,9 @@ class ResearchService {
                 const published = this.extractXmlValue(entry, 'published');
                 
                 // Extract authors
-                const authorMatches = entry.match(/<author><name>(.*?)<\/name><\/author>/g);
+                const authorMatches = entry.match(/<author>\s*<name>(.*?)<\/name>\s*<\/author>/gs);
                 const authors = authorMatches ? 
-                    authorMatches.map(match => match.match(/<name>(.*?)<\/name>/)[1]).join(', ') : '';
+                    authorMatches.map(match => match.match(/<name>(.*?)<\/name>/s)[1].trim()).join(', ') : '';
                 
                 // Extract arXiv ID and construct URLs
                 const arxivId = id.split('/').pop();
@@ -187,6 +189,23 @@ class ResearchService {
         });
         
         return papers;
+    }
+
+    /**
+     * Deduplicate papers by ID or arXiv ID
+     * @param {Array} papers - Array of paper objects
+     * @returns {Array} Deduplicated papers
+     */
+    deduplicatePapers(papers) {
+        const seen = new Set();
+        return papers.filter(paper => {
+            const key = paper.arxivId || paper.id;
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
     }
 
     /**
@@ -400,6 +419,47 @@ class ResearchService {
             }));
         } catch (error) {
             console.error('[ResearchService] Failed to get user papers:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a research paper from the database
+     * @param {string} paperId - Paper ID to delete
+     * @param {string} userId - User ID (for security)
+     */
+    async deletePaper(paperId, userId) {
+        try {
+            console.log(`[ResearchService] Deleting paper: ${paperId}`);
+            
+            // First get the paper to check if it has a file
+            const paper = this.db.getDb().prepare(
+                'SELECT file_path FROM research_papers WHERE id = ? AND uid = ?'
+            ).get(paperId, userId);
+            
+            if (!paper) {
+                throw new Error('Paper not found or access denied');
+            }
+            
+            // Delete the file if it exists
+            if (paper.file_path && fs.existsSync(paper.file_path)) {
+                try {
+                    fs.unlinkSync(paper.file_path);
+                    console.log(`[ResearchService] Deleted file: ${paper.file_path}`);
+                } catch (error) {
+                    console.warn(`[ResearchService] Failed to delete file: ${error.message}`);
+                }
+            }
+            
+            // Delete from database
+            const result = this.db.getDb().prepare(
+                'DELETE FROM research_papers WHERE id = ? AND uid = ?'
+            ).run(paperId, userId);
+            
+            console.log(`[ResearchService] Paper deleted successfully`);
+            return { success: true, deletedRows: result.changes };
+        } catch (error) {
+            console.error('[ResearchService] Failed to delete paper:', error);
             throw error;
         }
     }

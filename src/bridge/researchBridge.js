@@ -106,7 +106,15 @@ class ResearchBridge {
                 
                 // Get user's imported papers
                 getUserPapers: (limit = 50) => 
-                    window.api.invoke('research:getUserPapers', limit)
+                    window.api.invoke('research:getUserPapers', limit),
+                
+                // Delete a paper
+                deletePaper: (paperId) => 
+                    window.api.invoke('research:deletePaper', paperId),
+                
+                // Open paper file
+                openPaperFile: (filePath) => 
+                    window.api.invoke('research:openPaperFile', filePath)
             }
         };
     }

@@ -14,6 +14,10 @@ const classMap = (classes) => {
  */
 export class ResearchView extends LitElement {
     static styles = css`
+        * {
+            box-sizing: border-box;
+        }
+
         :host {
             display: flex;
             height: 100vh;
@@ -73,14 +77,16 @@ export class ResearchView extends LitElement {
         .toolbar {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
             padding: 1rem;
             background: var(--header-background, rgba(0, 0, 0, 0.8));
             border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.2));
+            flex-shrink: 0;
         }
 
         .search-container {
             flex: 1;
+            min-width: 0;
             position: relative;
         }
 
@@ -92,6 +98,7 @@ export class ResearchView extends LitElement {
             background: var(--input-background, rgba(0, 0, 0, 0.3));
             color: var(--text-color, #e5e5e7);
             font-size: 0.875rem;
+            box-sizing: border-box;
         }
 
         .search-input:focus {
@@ -110,6 +117,8 @@ export class ResearchView extends LitElement {
             font-size: 0.875rem;
             cursor: pointer;
             transition: background-color 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .action-button:hover {
@@ -131,6 +140,8 @@ export class ResearchView extends LitElement {
             font-size: 0.875rem;
             cursor: pointer;
             transition: all 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .secondary-button:hover {
@@ -139,15 +150,25 @@ export class ResearchView extends LitElement {
         }
 
         .content-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--header-background, rgba(0, 0, 0, 0.8));
+            min-height: 0;
         }
 
         .tab-container {
             display: flex;
-            border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.2));
-            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.8));
+            flex-shrink: 0;
+        }
+
+        .tab-content {
+            flex: 1 1 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 1rem;
         }
 
         .tab {
@@ -236,6 +257,8 @@ export class ResearchView extends LitElement {
         }
 
         .document-item {
+            display: flex;
+            align-items: center;
             padding: 0.75rem;
             background: var(--header-background, rgba(0, 0, 0, 0.8));
             border: 1px solid var(--border-color, rgba(255, 255, 255, 0.2));
@@ -322,22 +345,24 @@ export class ResearchView extends LitElement {
     `;
 
     static properties = {
-        currentTab: { type: String },
-        searchQuery: { type: String },
         searchResults: { type: Array },
         documents: { type: Array },
+        papers: { type: Array },
+        currentTab: { type: String },
+        selectedDocument: { type: Object },
         isLoading: { type: Boolean },
-        selectedDocument: { type: Object }
+        searchQuery: { type: String }
     };
 
     constructor() {
         super();
-        this.currentTab = 'search';
-        this.searchQuery = '';
         this.searchResults = [];
         this.documents = [];
-        this.isLoading = false;
+        this.papers = [];
+        this.currentTab = 'search';
         this.selectedDocument = null;
+        this.isLoading = false;
+        this.searchQuery = '';
     }
 
     connectedCallback() {
@@ -364,7 +389,7 @@ export class ResearchView extends LitElement {
                             <input
                                 type="text"
                                 class="search-input"
-                                placeholder="Search research papers..."
+                                placeholder="Search arXiv..."
                                 .value=${this.searchQuery}
                                 @input=${this.handleSearchInput}
                                 @keydown=${this.handleSearchKeydown}
@@ -404,7 +429,9 @@ export class ResearchView extends LitElement {
                             </div>
                         </div>
 
-                        ${this.renderTabContent()}
+                        <div class="tab-content">
+                            ${this.renderTabContent()}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -478,6 +505,8 @@ export class ResearchView extends LitElement {
     }
 
     renderLibrary() {
+        const totalItems = this.documents.length + this.papers.length;
+        
         return html`
             <div class="upload-zone" @drop=${this.handleDrop} @dragover=${this.handleDragOver} @dragleave=${this.handleDragLeave}>
                 <p>Drop PDF files here to upload them to your research library</p>
@@ -486,16 +515,41 @@ export class ResearchView extends LitElement {
                 </button>
             </div>
             
-            ${this.documents.length === 0 ? html`
+            ${totalItems === 0 ? html`
                 <div class="empty-state">
                     <h3>No documents yet</h3>
                     <p>Upload PDF files or import papers from search results</p>
                 </div>
             ` : html`
                 <div class="document-list">
+                    ${this.papers.map(paper => this.renderPaperLibraryCard(paper))}
                     ${this.documents.map(doc => this.renderDocumentCard(doc))}
                 </div>
             `}
+        `;
+    }
+
+    renderPaperLibraryCard(paper) {
+        return html`
+            <div class="document-item">
+                <div style="flex: 1; cursor: pointer;" @click=${() => this.openPaper(paper)}>
+                    <h4 class="document-name">${paper.title}</h4>
+                    <p class="document-info">
+                        ${paper.authors ? paper.authors.substring(0, 60) + '...' : 'Unknown authors'} • 
+                        ${paper.year || 'Unknown year'} • 
+                        ${paper.venue || 'arXiv'}
+                        ${paper.imported_at ? ' • Added ' + this.formatDate(paper.imported_at) : ''}
+                    </p>
+                </div>
+                <button 
+                    class="secondary-button small-button"
+                    style="margin-left: 0.5rem;"
+                    @click=${(e) => { e.stopPropagation(); this.deletePaper(paper); }}
+                    title="Remove from library"
+                >
+                    Remove
+                </button>
+            </div>
         `;
     }
 
@@ -657,6 +711,36 @@ export class ResearchView extends LitElement {
     updateDocuments(documents) {
         this.documents = documents;
         this.requestUpdate();
+    }
+
+    updatePapers(papers) {
+        this.papers = papers;
+        this.requestUpdate();
+    }
+
+    async deletePaper(paper) {
+        try {
+            this.dispatchEvent(new CustomEvent('delete-paper', {
+                detail: { paper },
+                bubbles: true,
+                composed: true
+            }));
+        } catch (error) {
+            console.error('Delete failed:', error);
+        }
+    }
+
+    openPaper(paper) {
+        // If paper has a file_path, open it, otherwise open the URL
+        if (paper.file_path) {
+            this.dispatchEvent(new CustomEvent('open-paper-file', {
+                detail: { paper },
+                bubbles: true,
+                composed: true
+            }));
+        } else if (paper.url) {
+            this.openPaperUrl(paper.url);
+        }
     }
 
     // Utility methods

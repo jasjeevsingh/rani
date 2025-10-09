@@ -163,19 +163,26 @@ const LATEST_SCHEMA = {
     research_papers: {
         columns: [
             { name: 'id', type: 'TEXT PRIMARY KEY' },
+            { name: 'uid', type: 'TEXT' },
             { name: 'title', type: 'TEXT NOT NULL' },
             { name: 'authors', type: 'TEXT' },
             { name: 'abstract', type: 'TEXT' },
+            { name: 'year', type: 'INTEGER' },
+            { name: 'venue', type: 'TEXT' },
             { name: 'url', type: 'TEXT' },
+            { name: 'pdf_url', type: 'TEXT' },
             { name: 'arxiv_id', type: 'TEXT' },
             { name: 'doi', type: 'TEXT' },
             { name: 'published_date', type: 'TEXT' },
             { name: 'citation_count', type: 'INTEGER' },
             { name: 'source', type: 'TEXT' },
+            { name: 'file_path', type: 'TEXT' },
+            { name: 'metadata', type: 'TEXT' },
             { name: 'added_at', type: 'INTEGER' },
+            { name: 'imported_at', type: 'INTEGER' },
             { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
         ]
-    }
+    },
 };
 
 module.exports = LATEST_SCHEMA; 

@@ -200,6 +200,34 @@ export class RaniApp extends LitElement {
         }
     }
 
+    async handleDeletePaper(e) {
+        const { paper } = e.detail;
+        try {
+            if (window.api && window.api.research) {
+                await window.api.research.deletePaper(paper.id);
+                // Refresh documents list
+                this.handleLoadDocuments();
+            } else {
+                console.log('[RaniApp] Delete paper:', e.detail);
+            }
+        } catch (error) {
+            console.error('Paper delete failed:', error);
+        }
+    }
+
+    async handleOpenPaperFile(e) {
+        const { paper } = e.detail;
+        try {
+            if (window.api && window.api.research) {
+                await window.api.research.openPaperFile(paper.file_path);
+            } else {
+                console.log('[RaniApp] Open paper file:', e.detail);
+            }
+        } catch (error) {
+            console.error('Open paper file failed:', error);
+        }
+    }
+
     async handleUploadDocument(e) {
         try {
             if (window.api && window.api.documents) {
@@ -236,10 +264,14 @@ export class RaniApp extends LitElement {
     async handleLoadDocuments(e) {
         try {
             if (window.api && window.api.documents) {
+                // Load both regular documents and research papers
                 const documents = await window.api.documents.getUserDocuments();
+                const papers = window.api.research ? await window.api.research.getUserPapers() : [];
+                
                 const researchView = this.shadowRoot.querySelector('research-view');
                 if (researchView) {
                     researchView.updateDocuments(documents);
+                    researchView.updatePapers(papers);
                 }
             } else {
                 // Fallback to mock data
@@ -293,11 +325,13 @@ export class RaniApp extends LitElement {
                 view = html`<research-view
                     @search-papers=${this.handleSearchPapers}
                     @import-paper=${this.handleImportPaper}
+                    @delete-paper=${this.handleDeletePaper}
                     @upload-document=${this.handleUploadDocument}
                     @files-dropped=${this.handleFilesDropped}
                     @load-documents=${this.handleLoadDocuments}
                     @document-selected=${this.handleDocumentSelected}
                     @open-document=${this.handleOpenDocument}
+                    @open-paper-file=${this.handleOpenPaperFile}
                 ></research-view>`;
                 break;
             case 'listen':
