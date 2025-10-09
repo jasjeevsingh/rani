@@ -98,9 +98,9 @@ class AskAudioCaptureVADSafe {
         let silenceStartTime = 0;
         let audioBuffer = [];
         
-        const SPEECH_THRESHOLD = 0.01; // Increased from 0.001 to reduce false positives
-        const MIN_SPEECH_DURATION = 1500; // Increased to 1.5 seconds minimum
-        const SILENCE_DURATION = 2000; // Increased to 2 seconds of silence
+        const SPEECH_THRESHOLD = 0.01; // Balanced threshold to reduce false positives
+        const MIN_SPEECH_DURATION = 600; // Reduced from 1500ms to 600ms for faster response
+        const SILENCE_DURATION = 800; // Reduced from 2000ms to 800ms for natural conversation flow
         const MAX_SPEECH_DURATION = 10000; // Maximum 10 seconds per segment
         
         processor.onaudioprocess = (event) => {
@@ -128,12 +128,12 @@ class AskAudioCaptureVADSafe {
             
             if (rms > SPEECH_THRESHOLD) {
                 if (!isSpeaking) {
-                    // Require sustained speech level for at least 200ms before triggering
+                    // Require sustained speech level for at least 100ms before triggering (reduced from 200ms)
                     if (speechStartTime === 0) {
                         speechStartTime = currentTime;
                         audioBuffer = [];
                         return; // Don't trigger immediately, wait for confirmation
-                    } else if (currentTime - speechStartTime < 200) {
+                    } else if (currentTime - speechStartTime < 100) {
                         // Still in the confirmation period
                         audioBuffer.push(...Array.from(inputData));
                         return;

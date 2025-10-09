@@ -852,14 +852,15 @@ Conversational response:`;
                                 conversationalResponse += token;
                                 sentenceBuffer += token;
                                 
-                                // Check for sentence boundaries
+                                // Check for sentence boundaries - more aggressive chunking
                                 if (this._isSentenceComplete(sentenceBuffer)) {
-                                    console.log(`[AskService] Sending TTS chunk: "${sentenceBuffer.trim()}"`);
+                                    const chunkText = sentenceBuffer.trim();
+                                    console.log(`[AskService] Sending TTS chunk (${chunkText.length} chars): "${chunkText.substring(0, 50)}..."`);
                                     // Send chunk immediately for TTS
                                     const targetWindow = this._getTargetWindow();
                                     if (targetWindow && !targetWindow.isDestroyed()) {
                                         targetWindow.webContents.send('ask:conversationalChunk', {
-                                            text: sentenceBuffer.trim(),
+                                            text: chunkText,
                                             isComplete: false,
                                             timestamp: Date.now()
                                         });
@@ -920,20 +921,25 @@ Conversational response:`;
      * Check if text contains a complete sentence
      */
     _isSentenceComplete(text) {
-        if (!text || text.trim().length < 20) return false; // Increased minimum length
+        if (!text || text.trim().length < 10) return false; // Reduced from 20 to 10 for faster response
     
         const trimmed = text.trim();
         
-        // Only accept proper sentence endings: period, exclamation, question mark
-        // Must be followed by end of string OR space + capital letter (new sentence)
-        const properSentenceEnders = /[.!?](\s*$|\s+[A-Z])/;
+        // Accept more natural break points for conversational flow
+        const naturalBreaks = /[.!?;](\s*$|\s+)/; // Added semicolon, removed capital letter requirement
         
-        // Additional check: avoid breaking on abbreviations or decimals
-        const avoidBreaking = /\b[A-Z][a-z]*\.$|\d+\.$|etc\.$|vs\.$|Mr\.$|Mrs\.$|Dr\.$|Prof\.$/;
-        
-        if (avoidBreaking.test(trimmed)) {
-            return false;
+        // For very short complete thoughts, allow immediate breaking
+        if (trimmed.length >= 15 && naturalBreaks.test(trimmed)) {
+            // Additional check: avoid breaking on abbreviations or decimals
+            const avoidBreaking = /\b[A-Z][a-z]*\.$|\d+\.$|etc\.$|vs\.$|Mr\.$|Mrs\.$|Dr\.$|Prof\.$/;
+            if (avoidBreaking.test(trimmed)) {
+                return false;
+            }
+            return true;
         }
+        
+        // For longer sentences, use stricter matching
+        const properSentenceEnders = /[.!?](\s*$|\s+[A-Z])/;
         
         return properSentenceEnders.test(trimmed);
     }

@@ -253,13 +253,13 @@ module.exports = {
           return { success: false, error: 'TTS service not initialized', fallback: true };
         }
         
-        console.log(`[FeatureBridge] Speaking with OpenAI TTS: "${text.substring(0, 50)}..."`);
+        console.log(`[FeatureBridge] Speaking with OpenAI TTS: "${text.substring(0, 50)}..." (interrupt: ${options.interrupt ?? false})`);
         
         const result = await ttsService.speak(text, {
           voice: options.voice || VOICE_CONFIG.defaultVoice,
           model: options.model || VOICE_CONFIG.model,
           speed: options.speed || VOICE_CONFIG.speed,
-          interrupt: true,
+          interrupt: options.interrupt ?? false, // Respect the frontend's interrupt flag
           cache: true
         });
         

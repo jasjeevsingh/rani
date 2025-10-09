@@ -2479,6 +2479,13 @@ export class AskView extends LitElement {
             }
         }
 
+        // Reset chunked TTS state when sending a new message
+        // This ensures the first chunk of the new response will interrupt properly
+        this.isChunkedTTSActive = false;
+        this.chunkIndex = 0;
+        this.chunkQueue = [];
+        this.processingChunks = false;
+        
         if (window.api) {
             window.api.askView.sendMessage(text).catch(error => {
                 console.error('Error sending text:', error);
@@ -2725,9 +2732,7 @@ export class AskView extends LitElement {
             const result = await window.api.voice.speakWithOpenAI(text, {
                 voice: 'nova', // Change this to match your desired voice
                 model: 'tts-1',
-                speed: 1.4, // Speed multiplier (1.0 = normal speed)
-                pitch: 2.0, // Pitch multiplier (1.0 = normal pitch)
-                volume: 0.8 // Volume multiplier (0.0 to 1.0)
+                speed: 1.6 // Speed multiplier (0.25 to 4.0, 1.0 = normal)
             });
             
             if (result.success) {
@@ -2764,20 +2769,21 @@ export class AskView extends LitElement {
         
         try {
             // For the first chunk, stop any currently playing speech and initialize queue
+            // IMPORTANT: Set flag IMMEDIATELY before any async operations to prevent race conditions
             const isFirstChunk = !this.isChunkedTTSActive;
             if (isFirstChunk) {
+                console.log('[AskView] First chunk detected - initializing chunked TTS mode');
+                this.isChunkedTTSActive = true; // Set IMMEDIATELY
                 this.stopSpeaking();
-                this.isChunkedTTSActive = true;
                 this.chunkQueue = [];
                 this.chunkIndex = 0;
                 this.processingChunks = false;
-                console.log('[AskView] Started chunked TTS mode');
             }
 
             // Add chunk to queue for sequential processing
-            const chunkData = { text, index: this.chunkIndex++, isComplete };
+            const chunkData = { text, index: this.chunkIndex++, isComplete, isFirstChunk };
             this.chunkQueue.push(chunkData);
-            console.log(`[AskView] Queued chunk ${chunkData.index}: "${text}"`);
+            console.log(`[AskView] Queued chunk ${chunkData.index} (isFirst: ${isFirstChunk}): "${text}"`);
 
             // Start processing queue if not already processing
             if (!this.processingChunks) {
@@ -2806,39 +2812,54 @@ export class AskView extends LitElement {
         this.processingChunks = true;
 
         try {
-            while (this.chunkQueue.length > 0) {
-                const chunk = this.chunkQueue.shift();
+            // Pre-fetch queue for overlapping network requests
+            const fetchQueue = [];
+            let lastChunkWasComplete = false;
+            
+            while (this.chunkQueue.length > 0 || fetchQueue.length > 0) {
+                // Pre-fetch next chunk while current is playing (max 2 chunks ahead)
+                while (fetchQueue.length < 2 && this.chunkQueue.length > 0) {
+                    const chunk = this.chunkQueue.shift();
+                    console.log(`[AskView] Pre-fetching chunk ${chunk.index}: "${chunk.text}" (interrupt: ${chunk.isFirstChunk || false})`);
+                    
+                    // Start fetching but don't wait
+                    const fetchPromise = window.api.voice.speakWithOpenAI(chunk.text, {
+                        voice: 'nova',
+                        model: 'tts-1',
+                        speed: 1.1,
+                        interrupt: chunk.isFirstChunk === true // Only interrupt for first chunk of new response
+                    }).then(result => ({ chunk, result }));
+                    
+                    fetchQueue.push(fetchPromise);
+                    lastChunkWasComplete = chunk.isComplete;
+                }
                 
-                console.log(`[AskView] Speaking chunk ${chunk.index}: "${chunk.text}"`);
+                if (fetchQueue.length === 0) break;
                 
-                const result = await window.api.voice.speakWithOpenAI(chunk.text, {
-                    voice: 'nova',
-                    model: 'tts-1',
-                    speed: 1.6, // Increased from 1.4 to 1.6 for faster speech
-                    pitch: 2.0,
-                    volume: 0.8,
-                    interrupt: chunk.index === 0 // Only interrupt for first chunk
-                });
+                // Wait for next chunk to complete (network + playback)
+                const { chunk, result } = await fetchQueue.shift();
                 
-                if (!result.success && result.fallback) {
-                    console.log('[AskView] OpenAI TTS not available for chunk, using Web Speech API');
-                    this.speakWithWebSpeechAPI(chunk.text);
-                } else if (!result.success) {
+                console.log(`[AskView] Finished speaking chunk ${chunk.index}:`, result);
+                
+                // Only use Web Speech fallback if explicitly flagged AND not successful
+                if (!result.success) {
                     console.error('[AskView] TTS chunk failed:', result.error);
-                }
-
-                // Minimal delay between chunks for smoother speech flow
-                if (this.chunkQueue.length > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 50)); // Reduced to 50ms
+                    // Only fallback if explicitly requested (e.g., TTS service unavailable)
+                    if (result.fallback) {
+                        console.log('[AskView] Using Web Speech API fallback');
+                        this.speakWithWebSpeechAPI(chunk.text);
+                    }
                 }
                 
-                // Check if this was the last chunk and mark completion
-                if (chunk.isComplete && this.chunkQueue.length === 0) {
-                    console.log('[AskView] Chunked TTS sequence completed');
-                    this.isChunkedTTSActive = false;
-                    this.chunkQueue = [];
-                    this.chunkIndex = 0;
-                }
+                // No artificial delay - next chunk is already pre-fetched
+            }
+            
+            // Mark completion
+            if (lastChunkWasComplete) {
+                console.log('[AskView] Chunked TTS sequence completed');
+                this.isChunkedTTSActive = false;
+                this.chunkQueue = [];
+                this.chunkIndex = 0;
             }
         } finally {
             this.processingChunks = false;
