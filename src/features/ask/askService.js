@@ -448,7 +448,7 @@ class AskService {
 
             const conversationHistory = this._formatConversationForPrompt(conversationHistoryRaw);
 
-            const systemPrompt = getSystemPrompt('rani_analysis', conversationHistory);
+            const systemPrompt = getSystemPrompt('research_assistant', conversationHistory);
 
             const messages = [
                 { role: 'system', content: systemPrompt },
