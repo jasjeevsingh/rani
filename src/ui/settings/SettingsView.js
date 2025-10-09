@@ -817,6 +817,15 @@ export class SettingsView extends LitElement {
                 } else if (!statusResult.running) {
                     // Ollama is installed but not running, start it
                     console.log('[SettingsView] Starting Ollama service...');
+                    
+                    // Re-enable LaunchAgent if it was disabled (macOS only, handled in backend)
+                    try {
+                        await window.api.settingsView.enableOllamaAutoStart();
+                        console.log('[SettingsView] Re-enabled Ollama auto-start');
+                    } catch (err) {
+                        console.warn('[SettingsView] Could not enable auto-start:', err);
+                    }
+                    
                     const startResult = await window.api.settingsView.startOllamaService();
                     
                     if (!startResult.success) {
@@ -1364,8 +1373,16 @@ export class SettingsView extends LitElement {
             
             if (result.success) {
                 console.log('[SettingsView] Ollama shut down successfully');
-                // Wait a moment for the service to fully stop before checking status
-                // (Ollama.app needs time to quit on macOS)
+                
+                // Disable LaunchAgent to prevent auto-restart (macOS only, handled in backend)
+                try {
+                    await window.api.settingsView.disableOllamaAutoStart();
+                    console.log('[SettingsView] Disabled Ollama auto-start');
+                } catch (err) {
+                    console.warn('[SettingsView] Could not disable auto-start:', err);
+                }
+                
+                // Wait for the service to fully stop
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 // Refresh status to reflect the change
                 await this.refreshOllamaStatus();
@@ -1514,8 +1531,13 @@ export class SettingsView extends LitElement {
                                 return html`
                                     <div class="model-item ${this.selectedLlm === model.id ? 'selected' : ''}" 
                                          @click=${(e) => {
-                                             // Only allow selection if model is installed
-                                             if (model.installed === true && !isInstalling) {
+                                             // For Ollama models, only allow selection if installed
+                                             // For other models (GPT-4o, etc), always allow selection
+                                             if (isOllama) {
+                                                 if (model.installed === true && !isInstalling) {
+                                                     this.selectModel('llm', model.id);
+                                                 }
+                                             } else {
                                                  this.selectModel('llm', model.id);
                                              }
                                          }}>

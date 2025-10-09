@@ -78,6 +78,8 @@ module.exports = {
     ipcMain.handle('ollama:auto-warm-up', async () => await ollamaService.handleAutoWarmUp());
     ipcMain.handle('ollama:get-warm-up-status', async () => await ollamaService.handleGetWarmUpStatus());
     ipcMain.handle('ollama:shutdown', async (event, force = false) => await ollamaService.handleShutdown(force));
+    ipcMain.handle('ollama:disable-autostart', async () => await ollamaService.handleDisableAutoStart());
+    ipcMain.handle('ollama:enable-autostart', async () => await ollamaService.handleEnableAutoStart());
 
     // Ask
     ipcMain.handle('ask:sendQuestionFromAsk', async (event, userPrompt) => await askService.sendMessage(userPrompt));

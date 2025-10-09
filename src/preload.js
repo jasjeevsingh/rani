@@ -254,6 +254,8 @@ contextBridge.exposeInMainWorld('api', {
     installOllama: () => ipcRenderer.invoke('localai:install', { service: 'ollama' }),
     startOllamaService: () => ipcRenderer.invoke('localai:start-service', 'ollama'),
     shutdownOllama: (graceful) => ipcRenderer.invoke('ollama:shutdown', graceful),
+    disableOllamaAutoStart: () => ipcRenderer.invoke('ollama:disable-autostart'),
+    enableOllamaAutoStart: () => ipcRenderer.invoke('ollama:enable-autostart'),
     
     // Whisper Management
     getWhisperInstalledModels: () => ipcRenderer.invoke('whisper:get-installed-models'),

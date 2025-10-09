@@ -1533,6 +1533,62 @@ class OllamaService extends EventEmitter {
         }
     }
     
+    async handleDisableAutoStart() {
+        try {
+            console.log('[OllamaService] Disabling Ollama auto-start...');
+            const platform = this.getPlatform();
+            
+            if (platform === 'darwin') {
+                // Unload the LaunchAgent to prevent auto-restart
+                try {
+                    await spawnAsync('launchctl', ['unload', '-w', `${process.env.HOME}/Library/LaunchAgents/com.ollama.plist`]);
+                    console.log('[OllamaService] LaunchAgent unloaded');
+                } catch (e) {
+                    // Try alternative path
+                    try {
+                        await spawnAsync('launchctl', ['unload', '/Library/LaunchAgents/com.ollama.plist']);
+                        console.log('[OllamaService] System LaunchAgent unloaded');
+                    } catch (e2) {
+                        console.log('[OllamaService] No LaunchAgent found to unload');
+                    }
+                }
+            }
+            
+            return { success: true };
+        } catch (error) {
+            console.error('[OllamaService] Failed to disable auto-start:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
+    async handleEnableAutoStart() {
+        try {
+            console.log('[OllamaService] Enabling Ollama auto-start...');
+            const platform = this.getPlatform();
+            
+            if (platform === 'darwin') {
+                // Load the LaunchAgent to enable auto-restart
+                try {
+                    await spawnAsync('launchctl', ['load', '-w', `${process.env.HOME}/Library/LaunchAgents/com.ollama.plist`]);
+                    console.log('[OllamaService] LaunchAgent loaded');
+                } catch (e) {
+                    // Try alternative path
+                    try {
+                        await spawnAsync('launchctl', ['load', '/Library/LaunchAgents/com.ollama.plist']);
+                        console.log('[OllamaService] System LaunchAgent loaded');
+                    } catch (e2) {
+                        console.log('[OllamaService] No LaunchAgent found to load');
+                    }
+                }
+            }
+            
+            return { success: true };
+        } catch (error) {
+            console.error('[OllamaService] Failed to enable auto-start:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
     // 설치 검증
     async verifyInstallation() {
         try {
