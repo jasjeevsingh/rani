@@ -298,6 +298,80 @@ This PDF document could not be processed for text extraction. The file may be en
     }
 
     /**
+     * Generate embeddings for an existing document
+     */
+    async generateEmbeddingsForDocument(documentId) {
+        try {
+            console.log(`[DocumentService] Generating embeddings for document ${documentId}`);
+            
+            // Get chunk count
+            const chunkCount = this.db.getDb().prepare(
+                'SELECT COUNT(*) as count FROM document_chunks WHERE document_id = ?'
+            ).get(documentId).count;
+            
+            if (chunkCount === 0) {
+                return { success: false, reason: 'no-chunks', processed: 0 };
+            }
+            
+            // Generate embeddings
+            const result = await this.embeddingService.embedDocument(documentId, { limit: chunkCount });
+            
+            console.log(`[DocumentService] Embedding complete for ${documentId}:`, result);
+            
+            return result;
+            
+        } catch (error) {
+            console.error('[DocumentService] Failed to generate embeddings:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get document embedding status
+     */
+    async getDocumentEmbeddingStatus(documentId, userId) {
+        try {
+            // Verify document ownership
+            const document = await this.getDocument(documentId, userId);
+            if (!document) {
+                throw new Error('Document not found or access denied');
+            }
+            
+            const result = this.db.getDb().prepare(`
+                SELECT 
+                    COUNT(*) as total_chunks,
+                    COUNT(CASE WHEN sync_state = 'embedded' THEN 1 END) as embedded_chunks
+                FROM document_chunks
+                WHERE document_id = ?
+            `).get(documentId);
+            
+            const { total_chunks, embedded_chunks } = result;
+            
+            let status = 'pending';
+            if (total_chunks === 0) {
+                status = 'no-chunks';
+            } else if (embedded_chunks === 0) {
+                status = 'pending';
+            } else if (embedded_chunks === total_chunks) {
+                status = 'complete';
+            } else {
+                status = 'partial';
+            }
+            
+            return {
+                status,
+                totalChunks: total_chunks,
+                embeddedChunks: embedded_chunks,
+                progress: total_chunks > 0 ? (embedded_chunks / total_chunks) * 100 : 0
+            };
+            
+        } catch (error) {
+            console.error('[DocumentService] Failed to get embedding status:', error);
+            return { status: 'error', error: error.message, totalChunks: 0, embeddedChunks: 0, progress: 0 };
+        }
+    }
+
+    /**
      * Delete a document
      */
     async deleteDocument(documentId, userId) {

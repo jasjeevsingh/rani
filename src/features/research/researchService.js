@@ -259,6 +259,13 @@ class ResearchService {
                         doi: paperData.doi,
                         arxivId: paperData.arxivId
                     });
+                    
+                    // Update paper with document_id
+                    if (document && document.id) {
+                        this.db.getDb().prepare(
+                            'UPDATE research_papers SET document_id = ? WHERE id = ?'
+                        ).run(document.id, paperId);
+                    }
                 } catch (importError) {
                     console.warn('[ResearchService] Document import failed:', importError.message);
                 }
@@ -420,6 +427,173 @@ class ResearchService {
         } catch (error) {
             console.error('[ResearchService] Failed to get user papers:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Generate embeddings for a specific paper
+     */
+    async generatePaperEmbeddings(paperId, userId) {
+        try {
+            // Get paper
+            const paper = this.db.getDb().prepare(
+                'SELECT * FROM research_papers WHERE id = ? AND uid = ?'
+            ).get(paperId, userId);
+            
+            if (!paper) {
+                throw new Error('Paper not found');
+            }
+            
+            // Find associated document by checking metadata
+            const documents = this.db.getDb().prepare(
+                'SELECT id FROM documents WHERE uid = ?'
+            ).all(userId);
+            
+            let documentId = null;
+            for (const doc of documents) {
+                const docData = this.db.getDb().prepare(
+                    'SELECT metadata FROM documents WHERE id = ?'
+                ).get(doc.id);
+                
+                if (docData && docData.metadata) {
+                    try {
+                        const metadata = JSON.parse(docData.metadata);
+                        if (metadata.paperId === paperId) {
+                            documentId = doc.id;
+                            break;
+                        }
+                    } catch (e) {
+                        // Skip invalid metadata
+                    }
+                }
+            }
+            
+            if (!documentId) {
+                throw new Error('No document found for this paper');
+            }
+            
+            // Generate embeddings
+            console.log(`[ResearchService] Generating embeddings for paper ${paperId}`);
+            const result = await this.documentService.generateEmbeddingsForDocument(documentId);
+            
+            return {
+                success: true,
+                paperId,
+                documentId,
+                ...result
+            };
+            
+        } catch (error) {
+            console.error('[ResearchService] Failed to generate paper embeddings:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Generate embeddings for all pending papers
+     */
+    async generateAllPendingEmbeddings(userId) {
+        try {
+            // Get all documents for user
+            const documents = this.db.getDb().prepare(
+                'SELECT id, metadata FROM documents WHERE uid = ?'
+            ).all(userId);
+            
+            const pendingDocs = [];
+            
+            for (const doc of documents) {
+                // Check if has chunks without embeddings
+                const pendingChunks = this.db.getDb().prepare(`
+                    SELECT COUNT(*) as count
+                    FROM document_chunks
+                    WHERE document_id = ?
+                    AND (embedding IS NULL OR sync_state != 'embedded')
+                `).get(doc.id).count;
+                
+                if (pendingChunks > 0) {
+                    pendingDocs.push(doc);
+                }
+            }
+            
+            console.log(`[ResearchService] Found ${pendingDocs.length} documents needing embeddings`);
+            
+            const results = [];
+            for (const doc of pendingDocs) {
+                try {
+                    const result = await this.documentService.generateEmbeddingsForDocument(doc.id);
+                    results.push({
+                        documentId: doc.id,
+                        ...result
+                    });
+                } catch (error) {
+                    console.error(`[ResearchService] Failed for document ${doc.id}:`, error);
+                    results.push({
+                        documentId: doc.id,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+            
+            return {
+                success: true,
+                total: pendingDocs.length,
+                results
+            };
+            
+        } catch (error) {
+            console.error('[ResearchService] Failed to generate all embeddings:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Get embedding status for a paper
+     */
+    async getPaperEmbeddingStatus(paperId, userId) {
+        try {
+            // Get document_id from research_papers table
+            const paper = this.db.getDb().prepare(
+                'SELECT document_id FROM research_papers WHERE id = ? AND uid = ?'
+            ).get(paperId, userId);
+            
+            if (!paper || !paper.document_id) {
+                return { status: 'no-document', totalChunks: 0, embeddedChunks: 0, progress: 0 };
+            }
+            
+            const documentId = paper.document_id;
+            
+            const result = this.db.getDb().prepare(`
+                SELECT 
+                    COUNT(*) as total_chunks,
+                    COUNT(CASE WHEN sync_state = 'embedded' THEN 1 END) as embedded_chunks
+                FROM document_chunks
+                WHERE document_id = ?
+            `).get(documentId);
+            
+            const { total_chunks, embedded_chunks } = result;
+            
+            let status = 'pending';
+            if (total_chunks === 0) {
+                status = 'no-chunks';
+            } else if (embedded_chunks === 0) {
+                status = 'pending';
+            } else if (embedded_chunks === total_chunks) {
+                status = 'complete';
+            } else {
+                status = 'partial';
+            }
+            
+            return {
+                status,
+                totalChunks: total_chunks,
+                embeddedChunks: embedded_chunks,
+                progress: total_chunks > 0 ? (embedded_chunks / total_chunks) * 100 : 0
+            };
+            
+        } catch (error) {
+            console.error('[ResearchService] Failed to get embedding status:', error);
+            return { status: 'error', error: error.message, totalChunks: 0, embeddedChunks: 0, progress: 0 };
         }
     }
 

@@ -164,6 +164,7 @@ const LATEST_SCHEMA = {
         columns: [
             { name: 'id', type: 'TEXT PRIMARY KEY' },
             { name: 'uid', type: 'TEXT' },
+            { name: 'document_id', type: 'TEXT' },
             { name: 'title', type: 'TEXT NOT NULL' },
             { name: 'authors', type: 'TEXT' },
             { name: 'abstract', type: 'TEXT' },

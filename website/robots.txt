@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jasjeevsingh.github.io/rani/sitemap.xml

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="RANI - Your AI Research Copilot. An intelligent desktop assistant that understands your screen, listens to your meetings, and helps you discover, analyze, and annotate research papers.">
+    <meta name="keywords" content="AI research assistant, research copilot, academic AI tool, PDF annotation, arXiv search, meeting transcription, academic research">
+    <meta name="author" content="RANI Team">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="RANI - Your AI Research Copilot">
+    <meta property="og:description" content="Transform your desktop into an intelligent research companion that sees, listens, and helps you discover research papers.">
+    <meta property="og:url" content="https://jasjeevsingh.github.io/rani/">
+    <meta property="og:image" content="https://jasjeevsingh.github.io/rani/assets/og-image.png">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="RANI - Your AI Research Copilot">
+    <meta name="twitter:description" content="Transform your desktop into an intelligent research companion that sees, listens, and helps you discover research papers.">
+    <meta name="twitter:image" content="https://jasjeevsingh.github.io/rani/assets/og-image.png">
+    
+    <title>RANI - Your AI Research Copilot</title>
+    
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <div class="logo">
+                    <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="40" height="40" rx="8" fill="url(#gradient)"/>
+                        <path d="M12 14h16M12 20h12M12 26h16" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
+                                <stop offset="0%" stop-color="#3B82F6"/>
+                                <stop offset="100%" stop-color="#8B5CF6"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <span class="logo-text">RANI</span>
+                </div>
+                <div class="nav-links">
+                    <a href="#features" class="nav-link">Features</a>
+                    <a href="#use-cases" class="nav-link">Use Cases</a>
+                    <a href="https://github.com/jasjeevsingh/rani" target="_blank" class="nav-link">Docs</a>
+                    <a href="https://github.com/jasjeevsingh/rani" target="_blank" class="nav-link">GitHub</a>
+                    <a href="#download" class="btn btn-primary btn-sm">Download</a>
+                </div>
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="#features" class="mobile-menu-link">Features</a>
+        <a href="#use-cases" class="mobile-menu-link">Use Cases</a>
+        <a href="https://github.com/jasjeevsingh/rani" target="_blank" class="mobile-menu-link">Docs</a>
+        <a href="https://github.com/jasjeevsingh/rani" target="_blank" class="mobile-menu-link">GitHub</a>
+        <a href="#download" class="mobile-menu-link">Download</a>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <div class="badge">Open Source Research Assistant</div>
+                <h1 class="hero-title">Your AI Research Copilot</h1>
+                <p class="hero-subtitle">
+                    RANI transforms your desktop into an intelligent research companion that 
+                    <span class="highlight">understands your screen</span>, 
+                    <span class="highlight">listens to your meetings</span>, and 
+                    <span class="highlight">helps you discover</span>, analyze, and annotate research papers.
+                </p>
+                <div class="hero-cta">
+                    <a href="#download" class="btn btn-primary btn-large">
+                        <span id="downloadText">Download for Mac</span>
+                        <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 13L5 8h10l-5 5z" fill="currentColor"/>
+                            <path d="M4 15h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </a>
+                    <a href="https://github.com/jasjeevsingh/rani" target="_blank" class="btn btn-secondary btn-large">
+                        <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 0C4.477 0 0 4.477 0 10c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0110 4.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C17.137 18.165 20 14.418 20 10c0-5.523-4.477-10-10-10z"/>
+                        </svg>
+                        View on GitHub
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
+                        <div class="stat-value" id="githubStars">Loading...</div>
+                        <div class="stat-label">GitHub Stars</div>
+                    </div>
+                    <div class="stat">
+                        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                        <div class="stat-value">100%</div>
+                        <div class="stat-label">Privacy First</div>
+                    </div>
+                    <div class="stat">
+                        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <div class="stat-value">Free</div>
+                        <div class="stat-label">Open Source</div>
+                    </div>
+                    <div class="stat">
+                        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                            <line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                        <div class="stat-value">Multi-Modal</div>
+                        <div class="stat-label">AI Technology</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Grid -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Everything You Need for Research</h2>
+                <p class="section-subtitle">Built by researchers, for researchers. RANI combines powerful AI with privacy-first design.</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                            <line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Context-Aware AI</h3>
+                    <p class="feature-description">
+                        RANI sees what you're reading on screen and hears what you're discussing. 
+                        Ask questions with full context—no more copy-pasting excerpts.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Screen capture integration</li>
+                        <li>Real-time audio transcription</li>
+                        <li>Conversation memory across sessions</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Smart Document Library</h3>
+                    <p class="feature-description">
+                        Upload, organize, and annotate PDFs with AI-powered semantic search. 
+                        Find connections across your entire research library.
+                    </p>
+                    <ul class="feature-list">
+                        <li>PDF import & annotation</li>
+                        <li>Vector embeddings for semantic search</li>
+                        <li>Cross-document reference linking</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="m21 21-4.35-4.35"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Paper Discovery</h3>
+                    <p class="feature-description">
+                        Search arXiv and Semantic Scholar directly from your desktop. 
+                        Import papers with metadata and PDFs automatically.
+                    </p>
+                    <ul class="feature-list">
+                        <li>arXiv API integration</li>
+                        <li>Semantic Scholar search (coming soon)</li>
+                        <li>Automatic citation tracking</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                            <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Meeting Assistant</h3>
+                    <p class="feature-description">
+                        Record and transcribe meetings, lectures, and interviews in real-time. 
+                        Get AI-generated summaries and action items.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Live transcription (mic + system audio)</li>
+                        <li>Speaker diarization</li>
+                        <li>Auto-generated meeting notes</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Multi-Provider AI</h3>
+                    <p class="feature-description">
+                        Choose from OpenAI, Anthropic Claude, Google Gemini, or run models locally with Ollama. 
+                        No vendor lock-in.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Bring your own API keys</li>
+                        <li>Local models (privacy-first)</li>
+                        <li>Research-tuned prompts</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Privacy First</h3>
+                    <p class="feature-description">
+                        Your research data stays on your device. Optional cloud sync when you need it. 
+                        Open source and transparent.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Local-first architecture</li>
+                        <li>SQLite + optional Firebase</li>
+                        <li>GPL-3.0 licensed</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section class="comparison">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Why Choose RANI?</h2>
+                <p class="section-subtitle">See how RANI compares to traditional research workflows</p>
+            </div>
+            <div class="comparison-table">
+                <div class="comparison-header">
+                    <div class="comparison-header-cell"></div>
+                    <div class="comparison-header-cell">Traditional Tools</div>
+                    <div class="comparison-header-cell highlight">RANI</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Context Awareness</div>
+                    <div class="comparison-cell">❌ Manual copy-paste</div>
+                    <div class="comparison-cell highlight">✅ Automatic screen/audio</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Paper Discovery</div>
+                    <div class="comparison-cell">❌ Multiple separate apps</div>
+                    <div class="comparison-cell highlight">✅ Integrated search & import</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">AI Provider</div>
+                    <div class="comparison-cell">❌ Locked to one service</div>
+                    <div class="comparison-cell highlight">✅ Multiple options + local</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Data Privacy</div>
+                    <div class="comparison-cell">❌ Cloud-only storage</div>
+                    <div class="comparison-cell highlight">✅ Local-first architecture</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Cost</div>
+                    <div class="comparison-cell">❌ Monthly subscription</div>
+                    <div class="comparison-cell highlight">✅ Free & open source</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Customization</div>
+                    <div class="comparison-cell">❌ Closed source</div>
+                    <div class="comparison-cell highlight">✅ Fully customizable</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section id="use-cases" class="use-cases">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Built for Your Workflow</h2>
+                <p class="section-subtitle">Whether you're a PhD student, professor, or industry researcher</p>
+            </div>
+            <div class="use-cases-grid">
+                <div class="use-case-card">
+                    <div class="use-case-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                            <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                        </svg>
+                    </div>
+                    <h3 class="use-case-title">Graduate Students</h3>
+                    <p class="use-case-description">Navigate your thesis with an AI companion that helps you understand complex papers and organize your literature review.</p>
+                    <div class="use-case-benefits">
+                        <div class="benefit">✓ Free and open source</div>
+                        <div class="benefit">✓ Explains complex formulas step-by-step</div>
+                        <div class="benefit">✓ Transcribes advisor meetings</div>
+                        <div class="benefit">✓ Organizes your reading list</div>
+                    </div>
+                </div>
+
+                <div class="use-case-card">
+                    <div class="use-case-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                    </div>
+                    <h3 class="use-case-title">Academic Researchers</h3>
+                    <p class="use-case-description">Focus on your research, not managing tools. RANI integrates paper discovery, annotation, and collaboration in one place.</p>
+                    <div class="use-case-benefits">
+                        <div class="benefit">✓ Smart paper organization</div>
+                        <div class="benefit">✓ Auto-transcribed lab meetings</div>
+                        <div class="benefit">✓ Cross-paper idea connections</div>
+                        <div class="benefit">✓ Privacy-first architecture</div>
+                    </div>
+                </div>
+
+                <div class="use-case-card">
+                    <div class="use-case-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                        </svg>
+                    </div>
+                    <h3 class="use-case-title">Industry R&D</h3>
+                    <p class="use-case-description">Accelerate R&D with enterprise-ready features including local deployment and private AI models.</p>
+                    <div class="use-case-benefits">
+                        <div class="benefit">✓ Local deployment option</div>
+                        <div class="benefit">✓ Private AI models (Ollama)</div>
+                        <div class="benefit">✓ Secure document handling</div>
+                        <div class="benefit">✓ Export citations for patents</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section id="download" class="download">
+        <div class="container">
+            <div class="download-content">
+                <h2 class="download-title">Ready to Transform Your Research?</h2>
+                <p class="download-subtitle">Download RANI for free and start your journey to smarter research today.</p>
+                <div class="download-buttons">
+                    <a href="https://github.com/jasjeevsingh/rani/releases/latest" class="btn btn-primary btn-large" id="primaryDownloadBtn">
+                        <span id="downloadBtnText">Download for Mac</span>
+                        <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 13L5 8h10l-5 5z" fill="currentColor"/>
+                            <path d="M4 15h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </a>
+                </div>
+                <div class="download-options">
+                    <span class="download-option-label">Also available for:</span>
+                    <a href="https://github.com/jasjeevsingh/rani/releases/latest" class="download-option">Windows</a>
+                    <span class="download-option-separator">•</span>
+                    <a href="https://github.com/jasjeevsingh/rani/releases/latest" class="download-option">Mac</a>
+                    <span class="download-option-separator">•</span>
+                    <a href="https://github.com/jasjeevsingh/rani/releases/latest" class="download-option">Linux</a>
+                </div>
+                <div class="download-note">
+                    <p><strong>Open Source:</strong> View the source code on <a href="https://github.com/jasjeevsingh/rani" target="_blank">GitHub</a></p>
+                    <p><strong>Getting Started:</strong> Check out the <a href="https://github.com/jasjeevsingh/rani#readme" target="_blank">documentation</a> for installation instructions</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="40" height="40" rx="8" fill="url(#gradient2)"/>
+                            <path d="M12 14h16M12 20h12M12 26h16" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="gradient2" x1="0" y1="0" x2="40" y2="40">
+                                    <stop offset="0%" stop-color="#3B82F6"/>
+                                    <stop offset="100%" stop-color="#8B5CF6"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <span class="footer-logo-text">RANI</span>
+                    </div>
+                    <p class="footer-description">
+                        Your AI Research Copilot.<br>
+                        Open source, privacy-first, and built for researchers.
+                    </p>
+                </div>
+
+                <div class="footer-section">
+                    <h4 class="footer-heading">Product</h4>
+                    <ul class="footer-links">
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#use-cases">Use Cases</a></li>
+                        <li><a href="#download">Download</a></li>
+                        <li><a href="https://github.com/jasjeevsingh/rani/releases" target="_blank">Changelog</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h4 class="footer-heading">Resources</h4>
+                    <ul class="footer-links">
+                        <li><a href="https://github.com/jasjeevsingh/rani#readme" target="_blank">Documentation</a></li>
+                        <li><a href="https://github.com/jasjeevsingh/rani/blob/main/README.md" target="_blank">Quick Start</a></li>
+                        <li><a href="https://github.com/jasjeevsingh/rani/discussions" target="_blank">Community</a></li>
+                        <li><a href="https://github.com/jasjeevsingh/rani/issues" target="_blank">Report Issues</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h4 class="footer-heading">Connect</h4>
+                    <ul class="footer-links">
+                        <li><a href="https://github.com/jasjeevsingh/rani" target="_blank">GitHub</a></li>
+                        <li><a href="https://github.com/jasjeevsingh/rani/blob/main/CONTRIBUTING.md" target="_blank">Contributing</a></li>
+                        <li><a href="https://github.com/jasjeevsingh/rani/blob/main/LICENSE" target="_blank">License (GPL-3.0)</a></li>
+                        <li><a href="https://github.com/jasjeevsingh" target="_blank">Contact</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p class="footer-copyright">
+                    © 2025 RANI. Open source under GPL-3.0 License.
+                </p>
+                <p class="footer-note">
+                    Built for the research community
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

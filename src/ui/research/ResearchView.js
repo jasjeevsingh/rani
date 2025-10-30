@@ -64,7 +64,9 @@ export class ResearchView extends LitElement {
         .sidebar-content {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 1rem;
+            min-height: 0;
         }
 
         .main-content {
@@ -254,6 +256,7 @@ export class ResearchView extends LitElement {
         .document-list {
             display: grid;
             gap: 0.75rem;
+            min-height: 0;
         }
 
         .document-item {
@@ -320,6 +323,54 @@ export class ResearchView extends LitElement {
             color: var(--description-color, rgba(255, 255, 255, 0.6));
         }
 
+        .embedding-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            margin-top: 0.25rem;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .status-processing {
+            background: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+        }
+
+        .status-complete {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .status-partial {
+            background: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+        }
+
+        .status-failed {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        .status-no-doc {
+            background: rgba(158, 158, 158, 0.2);
+            color: #9e9e9e;
+        }
+
+        .embed-button {
+            padding: 0.2rem 0.5rem;
+            font-size: 0.7rem;
+            border-radius: 4px;
+            margin-top: 0.25rem;
+        }
+
         @media (max-width: 768px) {
             .research-container {
                 flex-direction: column;
@@ -351,7 +402,9 @@ export class ResearchView extends LitElement {
         currentTab: { type: String },
         selectedDocument: { type: Object },
         isLoading: { type: Boolean },
-        searchQuery: { type: String }
+        searchQuery: { type: String },
+        embeddingStatuses: { type: Object },
+        documentEmbeddingStatuses: { type: Object }
     };
 
     constructor() {
@@ -363,6 +416,8 @@ export class ResearchView extends LitElement {
         this.selectedDocument = null;
         this.isLoading = false;
         this.searchQuery = '';
+        this.embeddingStatuses = {};
+        this.documentEmbeddingStatuses = {};
     }
 
     connectedCallback() {
@@ -530,43 +585,97 @@ export class ResearchView extends LitElement {
     }
 
     renderPaperLibraryCard(paper) {
+        const status = this.embeddingStatuses[paper.id] || { status: 'loading' };
+        
+        // Trigger loading status if we don't have it yet
+        if (!this.embeddingStatuses[paper.id]) {
+            this.loadSinglePaperStatus(paper.id);
+        }
+        
         return html`
-            <div class="document-item">
-                <div style="flex: 1; cursor: pointer;" @click=${() => this.openPaper(paper)}>
+            <div class="document-item" style="display: block;">
+                <div style="cursor: pointer;" @click=${() => this.openPaper(paper)}>
                     <h4 class="document-name">${paper.title}</h4>
-                    <p class="document-info">
+                    <p class="document-info" style="margin-bottom: 0.5rem;">
                         ${paper.authors ? paper.authors.substring(0, 60) + '...' : 'Unknown authors'} • 
                         ${paper.year || 'Unknown year'} • 
                         ${paper.venue || 'arXiv'}
                         ${paper.imported_at ? ' • Added ' + this.formatDate(paper.imported_at) : ''}
                     </p>
+                    ${this.renderEmbeddingBadge(status)}
                 </div>
-                <button 
-                    class="secondary-button small-button"
-                    style="margin-left: 0.5rem;"
-                    @click=${(e) => { e.stopPropagation(); this.deletePaper(paper); }}
-                    title="Remove from library"
-                >
-                    Remove
-                </button>
+                
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                    ${(status.status === 'pending' || status.status === 'failed' || status.status === 'partial' || status.status === 'loading') ? html`
+                        <button 
+                            class="secondary-button"
+                            @click=${(e) => { e.stopPropagation(); this.embedPaper(paper); }}
+                            ?disabled=${status.status === 'processing' || status.status === 'loading'}
+                            title="Generate embeddings for RAG search"
+                        >
+                            ${status.status === 'processing' ? '⚙️ Processing...' : '🔄 Embed'}
+                        </button>
+                    ` : ''}
+                    
+                    <button 
+                        class="secondary-button"
+                        @click=${(e) => { e.stopPropagation(); this.handleDeletePaper(paper); }}
+                        title="Remove from library"
+                    >
+                        🗑️ Remove
+                    </button>
+                </div>
             </div>
         `;
     }
 
     renderDocumentCard(document) {
+        const status = this.documentEmbeddingStatuses[document.id] || { status: 'loading' };
+        
+        // Trigger loading status if we don't have it yet
+        if (!this.documentEmbeddingStatuses[document.id]) {
+            this.loadSingleDocumentStatus(document.id);
+        }
+        
         return html`
-            <div class="document-item" @click=${() => this.openDocument(document)}>
-                <h4 class="document-name">${document.filename}</h4>
-                <p class="document-info">
-                    ${document.file_size ? this.formatFileSize(document.file_size) : ''} • 
-                    ${this.formatDate(document.uploaded_at)}
-                </p>
+            <div class="document-item" style="display: block;">
+                <div style="cursor: pointer;" @click=${() => this.openDocument(document)}>
+                    <h4 class="document-name">${document.filename}</h4>
+                    <p class="document-info" style="margin-bottom: 0.5rem;">
+                        ${document.file_size ? this.formatFileSize(document.file_size) : ''} • 
+                        ${this.formatDate(document.uploaded_at)}
+                    </p>
+                    ${this.renderEmbeddingBadge(status)}
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                    ${(status.status === 'pending' || status.status === 'failed' || status.status === 'partial' || status.status === 'loading') ? html`
+                        <button 
+                            class="secondary-button"
+                            @click=${(e) => { e.stopPropagation(); this.embedDocument(document); }}
+                            ?disabled=${status.status === 'processing' || status.status === 'loading'}
+                            title="Generate embeddings for RAG search"
+                        >
+                            ${status.status === 'processing' ? '⚙️ Processing...' : '🔄 Embed'}
+                        </button>
+                    ` : ''}
+                    
+                    <button 
+                        class="secondary-button"
+                        @click=${(e) => { e.stopPropagation(); this.handleDeleteDocument(document); }}
+                        title="Remove from library"
+                    >
+                        🗑️ Remove
+                    </button>
+                </div>
             </div>
         `;
     }
 
     renderDocumentList() {
-        if (this.documents.length === 0) {
+        const totalItems = this.documents.length + this.papers.length;
+        
+        if (totalItems === 0) {
             return html`
                 <div class="empty-state">
                     <p>No documents yet</p>
@@ -576,6 +685,7 @@ export class ResearchView extends LitElement {
 
         return html`
             <div class="document-list">
+                ${this.papers.slice(0, 10).map(paper => this.renderSidebarPaperCard(paper))}
                 ${this.documents.slice(0, 10).map(doc => html`
                     <div class="document-item" @click=${() => this.selectDocument(doc)}>
                         <h4 class="document-name">${doc.filename}</h4>
@@ -583,6 +693,71 @@ export class ResearchView extends LitElement {
                     </div>
                 `)}
             </div>
+        `;
+    }
+
+    renderSidebarPaperCard(paper) {
+        const status = this.embeddingStatuses[paper.id] || { status: 'loading' };
+        
+        // Trigger loading status if we don't have it yet
+        if (!this.embeddingStatuses[paper.id]) {
+            this.loadSinglePaperStatus(paper.id);
+        }
+        
+        return html`
+            <div class="document-item" style="display: block; padding: 0.75rem;">
+                <div @click=${() => this.openPaper(paper)} style="cursor: pointer;">
+                    <h4 class="document-name" style="margin-bottom: 0.25rem;">${paper.title}</h4>
+                    <p class="document-info" style="margin-bottom: 0.25rem; font-size: 0.7rem;">
+                        ${paper.year || 'N/A'} • ${paper.venue || 'arXiv'}
+                    </p>
+                    ${this.renderEmbeddingBadge(status)}
+                </div>
+                
+                <div style="display: flex; gap: 0.25rem; margin-top: 0.5rem;">
+                    ${(status.status === 'pending' || status.status === 'failed' || status.status === 'partial' || status.status === 'loading') ? html`
+                        <button 
+                            class="secondary-button embed-button"
+                            @click=${(e) => { e.stopPropagation(); this.embedPaper(paper); }}
+                            ?disabled=${status.status === 'processing' || status.status === 'loading'}
+                            title="Generate embeddings for RAG search"
+                        >
+                            ${status.status === 'processing' ? '⚙️ Processing...' : '🔄 Embed'}
+                        </button>
+                    ` : ''}
+                    
+                    <button 
+                        class="secondary-button embed-button"
+                        @click=${(e) => { e.stopPropagation(); this.handleDeletePaper(paper); }}
+                        title="Remove from library"
+                    >
+                        🗑️ Remove
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderEmbeddingBadge(status) {
+        const badges = {
+            'pending': { icon: '🟡', text: 'Not Embedded', class: 'status-pending' },
+            'processing': { icon: '⚙️', text: 'Generating...', class: 'status-processing' },
+            'complete': { icon: '✅', text: 'Ready', class: 'status-complete' },
+            'partial': { icon: '🟠', text: 'Partial', class: 'status-partial' },
+            'failed': { icon: '❌', text: 'Failed', class: 'status-failed' },
+            'no-document': { icon: '⚠️', text: 'No PDF', class: 'status-no-doc' },
+            'no-chunks': { icon: '⚠️', text: 'No Text', class: 'status-no-doc' },
+            'loading': { icon: '⏳', text: 'Checking...', class: 'status-processing' },
+            'error': { icon: '⚠️', text: 'Error', class: 'status-failed' }
+        };
+        
+        const badge = badges[status.status] || { icon: '🟡', text: 'Checking...', class: 'status-pending' };
+        
+        return html`
+            <span class="embedding-badge ${badge.class}">
+                ${badge.icon} ${badge.text}
+                ${status.progress > 0 && status.progress < 100 ? ` (${Math.round(status.progress)}%)` : ''}
+            </span>
         `;
     }
 
@@ -685,6 +860,165 @@ export class ResearchView extends LitElement {
         }
     }
 
+    async loadEmbeddingStatuses() {
+        if (!window.api?.research) return;
+        
+        for (const paper of this.papers) {
+            try {
+                const status = await window.api.research.getPaperEmbeddingStatus(paper.id);
+                this.embeddingStatuses[paper.id] = status;
+            } catch (error) {
+                console.error('Failed to load embedding status:', error);
+                this.embeddingStatuses[paper.id] = { status: 'error' };
+            }
+        }
+        this.requestUpdate();
+    }
+
+    async loadSinglePaperStatus(paperId) {
+        if (!window.api?.research) return;
+        
+        try {
+            const status = await window.api.research.getPaperEmbeddingStatus(paperId);
+            this.embeddingStatuses[paperId] = status;
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Failed to load embedding status:', error);
+            this.embeddingStatuses[paperId] = { status: 'error' };
+            this.requestUpdate();
+        }
+    }
+
+    handleDeletePaper(paper) {
+        // Dispatch event that parent will handle
+        this.dispatchEvent(new CustomEvent('delete-paper', {
+            detail: { paper },
+            bubbles: true,
+            composed: true
+        }));
+    }
+
+    handleDeleteDocument(document) {
+        // Dispatch event that parent will handle
+        this.dispatchEvent(new CustomEvent('delete-document', {
+            detail: { document },
+            bubbles: true,
+            composed: true
+        }));
+    }
+
+    async loadSingleDocumentStatus(documentId) {
+        if (!window.api?.documents) return;
+        
+        try {
+            const status = await window.api.documents.getDocumentEmbeddingStatus(documentId);
+            this.documentEmbeddingStatuses[documentId] = status;
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Failed to load document embedding status:', error);
+            this.documentEmbeddingStatuses[documentId] = { status: 'error' };
+            this.requestUpdate();
+        }
+    }
+
+    async embedDocument(document) {
+        if (!window.api?.documents) return;
+        
+        try {
+            this.documentEmbeddingStatuses[document.id] = { status: 'processing', progress: 0 };
+            this.requestUpdate();
+            
+            await window.api.documents.generateEmbeddingsForDocument(document.id);
+            
+            // Reload status
+            await this.loadSingleDocumentStatus(document.id);
+        } catch (error) {
+            console.error('Failed to embed document:', error);
+            this.documentEmbeddingStatuses[document.id] = { status: 'failed' };
+            this.requestUpdate();
+        }
+    }
+
+    handleDeleteDocument(document) {
+        // Dispatch event that parent will handle
+        this.dispatchEvent(new CustomEvent('delete-document', {
+            detail: { document },
+            bubbles: true,
+            composed: true
+        }));
+    }
+
+    async loadSingleDocumentStatus(documentId) {
+        if (!window.api?.documents) return;
+        
+        try {
+            const status = await window.api.documents.getDocumentEmbeddingStatus(documentId);
+            this.documentEmbeddingStatuses[documentId] = status;
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Failed to load document embedding status:', error);
+            this.documentEmbeddingStatuses[documentId] = { status: 'error' };
+            this.requestUpdate();
+        }
+    }
+
+    async embedDocument(document) {
+        if (!window.api?.documents) return;
+        
+        try {
+            this.documentEmbeddingStatuses[document.id] = { status: 'processing', progress: 0 };
+            this.requestUpdate();
+            
+            await window.api.documents.generateEmbeddingsForDocument(document.id);
+            
+            // Reload status
+            await this.loadSingleDocumentStatus(document.id);
+        } catch (error) {
+            console.error('Failed to embed document:', error);
+            this.documentEmbeddingStatuses[document.id] = { status: 'failed' };
+            this.requestUpdate();
+        }
+    }
+
+    async embedPaper(paper) {
+        try {
+            this.embeddingStatuses[paper.id] = { status: 'processing' };
+            this.requestUpdate();
+            
+            const result = await window.api.research.generatePaperEmbeddings(paper.id);
+            
+            if (result.success) {
+                this.embeddingStatuses[paper.id] = { 
+                    status: 'complete',
+                    totalChunks: result.processed,
+                    embeddedChunks: result.processed,
+                    progress: 100
+                };
+            } else {
+                this.embeddingStatuses[paper.id] = { 
+                    status: 'failed', 
+                    error: result.error 
+                };
+            }
+            
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Embedding generation failed:', error);
+            this.embeddingStatuses[paper.id] = { status: 'failed', error: error.message };
+            this.requestUpdate();
+        }
+    }
+
+    async embedAllPapers() {
+        try {
+            const result = await window.api.research.generateAllPendingEmbeddings();
+            // Refresh statuses after batch operation
+            await this.loadEmbeddingStatuses();
+        } catch (error) {
+            console.error('Batch embedding failed:', error);
+        }
+    }
+
     selectDocument(document) {
         this.selectedDocument = document;
         this.dispatchEvent(new CustomEvent('document-selected', {
@@ -716,6 +1050,8 @@ export class ResearchView extends LitElement {
     updatePapers(papers) {
         this.papers = papers;
         this.requestUpdate();
+        // Load embedding statuses for all papers
+        this.loadEmbeddingStatuses();
     }
 
     async deletePaper(paper) {

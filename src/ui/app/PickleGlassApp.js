@@ -215,6 +215,21 @@ export class RaniApp extends LitElement {
         }
     }
 
+    async handleDeleteDocument(e) {
+        const { document } = e.detail;
+        try {
+            if (window.api && window.api.documents) {
+                await window.api.documents.deleteDocument(document.id);
+                // Refresh documents list
+                this.handleLoadDocuments();
+            } else {
+                console.log('[RaniApp] Delete document:', e.detail);
+            }
+        } catch (error) {
+            console.error('Document delete failed:', error);
+        }
+    }
+
     async handleOpenPaperFile(e) {
         const { paper } = e.detail;
         try {
@@ -326,6 +341,7 @@ export class RaniApp extends LitElement {
                     @search-papers=${this.handleSearchPapers}
                     @import-paper=${this.handleImportPaper}
                     @delete-paper=${this.handleDeletePaper}
+                    @delete-document=${this.handleDeleteDocument}
                     @upload-document=${this.handleUploadDocument}
                     @files-dropped=${this.handleFilesDropped}
                     @load-documents=${this.handleLoadDocuments}

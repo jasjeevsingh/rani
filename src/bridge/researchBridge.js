@@ -64,7 +64,15 @@ class ResearchBridge {
                 
                 // Open document in viewer
                 openDocument: (documentId) => 
-                    window.api.invoke('documents:openDocument', documentId)
+                    window.api.invoke('documents:openDocument', documentId),
+                
+                // Generate embeddings for document
+                generateEmbeddingsForDocument: (documentId) => 
+                    window.api.invoke('documents:generateEmbeddings', documentId),
+                
+                // Get document embedding status
+                getDocumentEmbeddingStatus: (documentId) => 
+                    window.api.invoke('documents:getEmbeddingStatus', documentId)
             },
 
             // Annotation management API
@@ -114,7 +122,19 @@ class ResearchBridge {
                 
                 // Open paper file
                 openPaperFile: (filePath) => 
-                    window.api.invoke('research:openPaperFile', filePath)
+                    window.api.invoke('research:openPaperFile', filePath),
+                
+                // Generate embeddings for paper
+                generatePaperEmbeddings: (paperId) => 
+                    window.api.invoke('research:generatePaperEmbeddings', paperId),
+                
+                // Generate embeddings for all pending papers
+                generateAllPendingEmbeddings: () => 
+                    window.api.invoke('research:generateAllPendingEmbeddings'),
+                
+                // Get embedding status
+                getPaperEmbeddingStatus: (paperId) => 
+                    window.api.invoke('research:getPaperEmbeddingStatus', paperId)
             }
         };
     }

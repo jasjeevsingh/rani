@@ -65,6 +65,16 @@ class ResearchFeature {
             return await this.openDocumentViewer(documentId);
         });
 
+        this.ipc.handle('documents:generateEmbeddings', async (documentId) => {
+            const userId = await this.getCurrentUserId();
+            return await this.documentService.generateEmbeddingsForDocument(documentId, userId);
+        });
+
+        this.ipc.handle('documents:getEmbeddingStatus', async (documentId) => {
+            const userId = await this.getCurrentUserId();
+            return await this.documentService.getDocumentEmbeddingStatus(documentId, userId);
+        });
+
         // Annotation management
         this.ipc.handle('annotations:create', async (annotationData) => {
             return await this.annotationService.createAnnotation(annotationData);
@@ -117,6 +127,22 @@ class ResearchFeature {
                 return { success: true };
             }
             throw new Error('File not found');
+        });
+
+        // Manual embedding operations
+        this.ipc.handle('research:generatePaperEmbeddings', async (paperId) => {
+            const userId = await this.getCurrentUserId();
+            return await this.researchService.generatePaperEmbeddings(paperId, userId);
+        });
+
+        this.ipc.handle('research:generateAllPendingEmbeddings', async () => {
+            const userId = await this.getCurrentUserId();
+            return await this.researchService.generateAllPendingEmbeddings(userId);
+        });
+
+        this.ipc.handle('research:getPaperEmbeddingStatus', async (paperId) => {
+            const userId = await this.getCurrentUserId();
+            return await this.researchService.getPaperEmbeddingStatus(paperId, userId);
         });
     }
 
