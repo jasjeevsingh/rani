@@ -1,6 +1,8 @@
 const DocumentService = require('../documents/documentService');
 const AnnotationService = require('../documents/annotationService');
 const ResearchService = require('./researchService');
+const ZoteroService = require('./zoteroService');
+const ZoteroSyncService = require('./zoteroSyncService');
 
 /**
  * Research Feature Integration for RANI
@@ -20,6 +22,14 @@ class ResearchFeature {
         this.documentService = new DocumentService(databaseClient, userDir);
         this.annotationService = new AnnotationService(databaseClient);
         this.researchService = new ResearchService(databaseClient, this.documentService);
+        this.zoteroService = new ZoteroService(databaseClient);
+        this.zoteroSyncService = new ZoteroSyncService(
+            databaseClient,
+            this.zoteroService,
+            this.researchService,
+            this.documentService,
+            userDir
+        );
         
         this.setupIpcHandlers();
     }
@@ -143,6 +153,41 @@ class ResearchFeature {
         this.ipc.handle('research:getPaperEmbeddingStatus', async (paperId) => {
             const userId = await this.getCurrentUserId();
             return await this.researchService.getPaperEmbeddingStatus(paperId, userId);
+        });
+
+        // Zotero integration handlers
+        this.ipc.handle('zotero:testConnection', async (event, apiKey, userId, libraryType) => {
+            return await this.zoteroService.testConnection(apiKey, userId, libraryType);
+        });
+
+        this.ipc.handle('zotero:saveCredentials', async (event, apiKey, zoteroUserId, libraryType) => {
+            const uid = await this.getCurrentUserId();
+            return await this.zoteroService.saveCredentials(uid, apiKey, zoteroUserId, libraryType);
+        });
+
+        this.ipc.handle('zotero:getCredentials', async () => {
+            const uid = await this.getCurrentUserId();
+            return await this.zoteroService.getCredentials(uid);
+        });
+
+        this.ipc.handle('zotero:deleteCredentials', async () => {
+            const uid = await this.getCurrentUserId();
+            return await this.zoteroService.deleteCredentials(uid);
+        });
+
+        this.ipc.handle('zotero:syncLibrary', async (event, options = {}) => {
+            const uid = await this.getCurrentUserId();
+            return await this.zoteroSyncService.syncLibrary(uid, options);
+        });
+
+        this.ipc.handle('zotero:getSyncStatus', async () => {
+            const uid = await this.getCurrentUserId();
+            return await this.zoteroSyncService.getSyncStatus(uid);
+        });
+
+        this.ipc.handle('zotero:deleteAllSyncedItems', async () => {
+            const uid = await this.getCurrentUserId();
+            return await this.zoteroSyncService.deleteAllSyncedItems(uid);
         });
     }
 

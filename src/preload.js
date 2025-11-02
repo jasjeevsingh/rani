@@ -416,6 +416,37 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('research:getUserPapers', limit)
   },
 
+  // Zotero integration API
+  zotero: {
+    // Test connection with API key
+    testConnection: (apiKey, userId, libraryType = 'user') =>
+      ipcRenderer.invoke('zotero:testConnection', apiKey, userId, libraryType),
+    
+    // Save Zotero credentials
+    saveCredentials: (apiKey, userId, libraryType = 'user') =>
+      ipcRenderer.invoke('zotero:saveCredentials', apiKey, userId, libraryType),
+    
+    // Get saved credentials
+    getCredentials: () =>
+      ipcRenderer.invoke('zotero:getCredentials'),
+    
+    // Delete credentials
+    deleteCredentials: () =>
+      ipcRenderer.invoke('zotero:deleteCredentials'),
+    
+    // Sync library from Zotero
+    syncLibrary: (options = {}) =>
+      ipcRenderer.invoke('zotero:syncLibrary', options),
+    
+    // Get sync status
+    getSyncStatus: () =>
+      ipcRenderer.invoke('zotero:getSyncStatus'),
+    
+    // Delete all synced items
+    deleteAllSyncedItems: () =>
+      ipcRenderer.invoke('zotero:deleteAllSyncedItems')
+  },
+
   // Voice/TTS API
   voice: {
     // Speak text using OpenAI TTS

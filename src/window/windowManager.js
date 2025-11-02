@@ -50,24 +50,26 @@ const internalBridge = require('../bridge/internalBridge');
 const permissionRepository = require('../features/common/repositories/permission');
 
 /* ────────────────[ GLASS BYPASS ]─────────────── */
-let liquidGlass;
-const isLiquidGlassSupported = () => {
-    if (process.platform !== 'darwin') {
-        return false;
-    }
-    const majorVersion = parseInt(os.release().split('.')[0], 10);
-    // return majorVersion >= 25; // macOS 26+ (Darwin 25+)
-    return majorVersion >= 26; // See you soon!
-};
-let shouldUseLiquidGlass = isLiquidGlassSupported();
-if (shouldUseLiquidGlass) {
-    try {
-        liquidGlass = require('electron-liquid-glass');
-    } catch (e) {
-        console.warn('Could not load optional dependency "electron-liquid-glass". The feature will be disabled.');
-        shouldUseLiquidGlass = false;
-    }
-}
+// DISABLED: LiquidGlass causing mouse/scroll issues
+// let liquidGlass;
+// const isLiquidGlassSupported = () => {
+//     if (process.platform !== 'darwin') {
+//         return false;
+//     }
+//     const majorVersion = parseInt(os.release().split('.')[0], 10);
+//     // return majorVersion >= 25; // macOS 26+ (Darwin 25+)
+//     return majorVersion >= 26; // See you soon!
+// };
+// let shouldUseLiquidGlass = isLiquidGlassSupported();
+// if (shouldUseLiquidGlass) {
+//     try {
+//         liquidGlass = require('electron-liquid-glass');
+//     } catch (e) {
+//         console.warn('Could not load optional dependency "electron-liquid-glass". The feature will be disabled.');
+//         shouldUseLiquidGlass = false;
+//     }
+// }
+let shouldUseLiquidGlass = false; // Disabled
 /* ────────────────[ GLASS BYPASS ]─────────────── */
 
 let isContentProtectionOn = true;
@@ -454,6 +456,7 @@ async function handleWindowVisibilityRequest(windowPool, layoutManager, movement
 
                 win.setOpacity(0);
                 win.setBounds(startPos);
+                win.setIgnoreMouseEvents(false); // Ensure scroll events work
                 win.show();
 
                 movementManager.fade(win, { to: 1 });
@@ -614,27 +617,39 @@ function createFeatureWindows(header, namesToCreate) {
 
             // research
             case 'research': {
-                const research = new BrowserWindow({ ...commonChildOptions, width: 800 });
+                // Use a non-transparent window to ensure mouse/scroll events work properly
+                const researchOptions = {
+                    parent: header,
+                    show: false,
+                    frame: false,
+                    transparent: false, // Must be false for mouse events to work
+                    backgroundColor: '#1a1a1a', // Dark background
+                    hasShadow: true,
+                    skipTaskbar: true,
+                    hiddenInMissionControl: true,
+                    resizable: false,
+                    width: 800,
+                    height: 600, // Set fixed height so content overflows and can scroll
+                    webPreferences: {
+                        nodeIntegration: false,
+                        contextIsolation: true,
+                        preload: path.join(__dirname, '../preload.js'),
+                    },
+                };
+                const research = new BrowserWindow(researchOptions);
                 research.setContentProtection(isContentProtectionOn);
                 research.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
                 if (process.platform === 'darwin') {
                     research.setWindowButtonVisibility(false);
                 }
-                const researchLoadOptions = { query: { view: 'research' } };
-                if (!shouldUseLiquidGlass) {
-                    research.loadFile(path.join(__dirname, '../ui/app/content.html'), researchLoadOptions);
-                } else {
-                    researchLoadOptions.query.glass = 'true';
-                    research.loadFile(path.join(__dirname, '../ui/app/content.html'), researchLoadOptions);
-                    research.webContents.once('did-finish-load', () => {
-                        const viewId = liquidGlass.addView(research.getNativeWindowHandle());
-                        if (viewId !== -1) {
-                            liquidGlass.unstable_setVariant(viewId, liquidGlass.GlassMaterialVariant.bubbles);
-                            // liquidGlass.unstable_setScrim(viewId, 1);
-                            // liquidGlass.unstable_setSubdued(viewId, 1);
-                        }
-                    });
-                }
+                
+                // Always load without glass since it's disabled
+                research.loadFile(path.join(__dirname, '../ui/app/content.html'), { query: { view: 'research' } });
+                
+                // Ensure mouse events work
+                research.webContents.once('did-finish-load', () => {
+                    research.setIgnoreMouseEvents(false);
+                });
                 
                 // Open DevTools in development
                 if (!app.isPackaged) {

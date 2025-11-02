@@ -156,6 +156,7 @@ const LATEST_SCHEMA = {
             { name: 'highlight_text', type: 'TEXT' },
             { name: 'note_text', type: 'TEXT' },
             { name: 'annotation_type', type: 'TEXT DEFAULT \'highlight\'' },
+            { name: 'zotero_note_key', type: 'TEXT' },
             { name: 'created_at', type: 'INTEGER' },
             { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
         ]
@@ -181,9 +182,22 @@ const LATEST_SCHEMA = {
             { name: 'metadata', type: 'TEXT' },
             { name: 'added_at', type: 'INTEGER' },
             { name: 'imported_at', type: 'INTEGER' },
+            { name: 'zotero_key', type: 'TEXT' },
+            { name: 'zotero_version', type: 'INTEGER' },
             { name: 'sync_state', type: 'TEXT DEFAULT \'clean\'' }
         ]
     },
+    zotero_credentials: {
+        columns: [
+            { name: 'uid', type: 'TEXT PRIMARY KEY' },
+            { name: 'api_key', type: 'TEXT NOT NULL' },
+            { name: 'zotero_user_id', type: 'TEXT NOT NULL' },
+            { name: 'library_type', type: 'TEXT DEFAULT \'user\'' },
+            { name: 'last_sync_version', type: 'INTEGER' },
+            { name: 'last_sync_at', type: 'INTEGER' },
+            { name: 'updated_at', type: 'INTEGER' }
+        ]
+    }
 };
 
 module.exports = LATEST_SCHEMA; 
