@@ -16,73 +16,6 @@ mobileMenuLinks.forEach(link => {
     });
 });
 
-// OS Detection for Download Buttons
-function detectOS() {
-    const userAgent = window.navigator.userAgent;
-    const platform = window.navigator.platform;
-    const macosPlatforms = ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'];
-    const windowsPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE'];
-    const iosPlatforms = ['iPhone', 'iPad', 'iPod'];
-    
-    let os = 'Unknown';
-    
-    if (macosPlatforms.indexOf(platform) !== -1) {
-        os = 'Mac';
-    } else if (iosPlatforms.indexOf(platform) !== -1) {
-        os = 'iOS';
-    } else if (windowsPlatforms.indexOf(platform) !== -1) {
-        os = 'Windows';
-    } else if (/Android/.test(userAgent)) {
-        os = 'Android';
-    } else if (/Linux/.test(platform)) {
-        os = 'Linux';
-    }
-    
-    return os;
-}
-
-// Update Download Button Text Based on OS
-function updateDownloadButtons() {
-    const os = detectOS();
-    const downloadTexts = document.querySelectorAll('#downloadText, #downloadBtnText');
-    
-    downloadTexts.forEach(element => {
-        if (os === 'Windows') {
-            element.textContent = 'Download for Windows';
-        } else if (os === 'Linux') {
-            element.textContent = 'Download for Linux';
-        } else if (os === 'Mac') {
-            element.textContent = 'Download for Mac';
-        } else {
-            element.textContent = 'Download RANI';
-        }
-    });
-}
-
-// Fetch GitHub Stars
-async function fetchGitHubStars() {
-    try {
-        const response = await fetch('https://api.github.com/repos/jasjeevsingh/rani');
-        const data = await response.json();
-        const stars = data.stargazers_count || 0;
-        const forks = data.forks_count || 0;
-        
-        const starsElement = document.getElementById('githubStars');
-        if (starsElement) {
-            starsElement.textContent = stars > 0 ? stars.toLocaleString() : 'Star Us';
-        }
-        
-        // Optional: Update other stats if needed
-        console.log('GitHub Stats:', { stars, forks });
-    } catch (error) {
-        console.error('Error fetching GitHub stats:', error);
-        const starsElement = document.getElementById('githubStars');
-        if (starsElement) {
-            starsElement.textContent = 'Star Us';
-        }
-    }
-}
-
 // Smooth Scroll for Anchor Links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
@@ -148,9 +81,6 @@ window.addEventListener('scroll', () => {
 
 // Initialize on Page Load
 document.addEventListener('DOMContentLoaded', () => {
-    updateDownloadButtons();
-    fetchGitHubStars();
-    
     // Add fade-in to hero content
     const heroContent = document.querySelector('.hero-content');
     if (heroContent) {
