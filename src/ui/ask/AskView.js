@@ -921,61 +921,49 @@ export class AskView extends LitElement {
             position: relative;
         }
 
-        .retrieval-context {
-            padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            backdrop-filter: blur(18px);
+        .retrieval-footnote {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.65);
+            font-style: italic;
+            line-height: 1.4;
         }
 
-        .retrieval-context__header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 0.85rem;
+        .retrieval-footnote__label {
+            display: block;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 0.5rem;
+            letter-spacing: 0.08em;
+            font-size: 0.68rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 6px;
         }
 
-        .retrieval-context__list {
-            display: grid;
-            gap: 0.5rem;
-        }
-
-        .retrieval-context__item {
-            padding: 0.5rem 0.6rem;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .retrieval-context__title {
+        .retrieval-footnote__item {
+            margin: 0;
             display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-size: 0.82rem;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.85);
-            margin-bottom: 0.35rem;
+            gap: 6px;
+            align-items: flex-start;
         }
 
-        .retrieval-context__score {
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.6);
+        .retrieval-footnote__index {
+            flex-shrink: 0;
+            font-style: normal;
+            color: rgba(255, 255, 255, 0.45);
         }
 
-        .retrieval-context__body {
-            font-size: 0.82rem;
-            line-height: 1.5;
-            color: rgba(255, 255, 255, 0.78);
-            display: -webkit-box;
-            -webkit-line-clamp: 5;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+        .retrieval-footnote__body {
             white-space: pre-wrap;
+            color: rgba(255, 255, 255, 0.7);
+            flex: 1;
+        }
+
+        .retrieval-footnote__meta {
+            display: block;
+            margin-bottom: 4px;
+            font-style: normal;
+            color: rgba(255, 255, 255, 0.55);
         }
 
         .conversation-container::-webkit-scrollbar {
@@ -3077,7 +3065,6 @@ export class AskView extends LitElement {
 
                 <!-- Unified Conversation Container -->
                 <div class="conversation-container ${!hasConversation ? 'hidden' : ''}" id="conversationContainer">
-                    ${this.renderRetrievalContext()}
                     <!-- Conversation History -->
                     ${(() => {
                         return this.conversationHistory.map((message, index) => html`
@@ -3104,6 +3091,8 @@ export class AskView extends LitElement {
                             </div>
                         </div>
                     ` : ''}
+
+                    ${this.renderRetrievalContext()}
                 </div>
 
                 <!-- Text Input Container -->
@@ -3167,30 +3156,28 @@ export class AskView extends LitElement {
         const usingCount = Math.min(5, total);
 
         return html`
-            <div class="retrieval-context">
-                <div class="retrieval-context__header">
-                    <span>Document Context</span>
-                    <span>Using ${usingCount}${total > 1 ? ', showing best match' : ''}</span>
-                </div>
-                <div class="retrieval-context__list">
-                    ${items.map((chunk, index) => {
-                        const metadata = chunk.metadata || {};
-                        const title = metadata.title || metadata.filename || `Source ${index + 1}`;
-                        const score = typeof chunk.score === 'number' ? chunk.score : null;
-                        const body = (chunk.content || '').trim();
-                        const displayBody = body.length > 400 ? `${body.slice(0, 400)}…` : body;
+            <div class="retrieval-footnote">
+                <span class="retrieval-footnote__label">Sources (using ${usingCount}${total > 1 ? ', showing best match' : ''})</span>
+                ${items.map((chunk, index) => {
+                    const metadata = chunk.metadata || {};
+                    const title = metadata.title || metadata.filename || `Source ${index + 1}`;
+                    const score = typeof chunk.score === 'number' ? chunk.score : null;
+                    const location = metadata.startOffset != null ? `offset ${metadata.startOffset}` : '';
+                    const body = (chunk.content || '').trim();
+                    const displayBody = body.length > 400 ? `${body.slice(0, 400)}…` : body;
 
-                        return html`
-                            <div class="retrieval-context__item">
-                                <div class="retrieval-context__title">
-                                    <span>${index + 1}. ${title}</span>
-                                    ${score !== null ? html`<span class="retrieval-context__score">${score.toFixed(2)}</span>` : ''}
-                                </div>
-                                <div class="retrieval-context__body">${displayBody}</div>
-                            </div>
-                        `;
-                    })}
-                </div>
+                    return html`
+                        <p class="retrieval-footnote__item">
+                            <span class="retrieval-footnote__index">[${index + 1}]</span>
+                            <span class="retrieval-footnote__body">
+                                <span class="retrieval-footnote__meta">
+                                    ${title}${location ? html` • ${location}` : ''}${score !== null ? html` • score ${score.toFixed(2)}` : ''}
+                                </span>
+                                ${displayBody}
+                            </span>
+                        </p>
+                    `;
+                })}
             </div>
         `;
     }
