@@ -1,6 +1,11 @@
 import { html, css, LitElement } from '../assets/lit-core-2.7.4.min.js';
 // import { getOllamaProgressTracker } from '../../features/common/services/localProgressTracker.js'; // 제거됨
 
+const LLM_MODEL_WHITELIST = [
+    { id: 'gpt-4o', name: 'GPT-4o' },
+    { id: 'mistral:7b', name: 'Mistral 7B', description: 'Mistral 7B - High quality open model' },
+];
+
 export class SettingsView extends LitElement {
     static styles = css`
         * {
@@ -902,7 +907,12 @@ export class SettingsView extends LitElement {
             window.api.settingsView.getAllKeys()
         ]);
         console.log('[SettingsView] Available LLM models:', availableLlm);
-        this.availableLlmModels = availableLlm;
+        const llmModelsById = new Map(availableLlm.map(model => [model.id, model]));
+        this.availableLlmModels = LLM_MODEL_WHITELIST
+            .map(meta => {
+                const resolved = llmModelsById.get(meta.id) || {};
+                return { ...resolved, ...meta };
+            });
         this.availableSttModels = availableStt;
         this.selectedLlm = selected.llm;
         this.selectedStt = selected.stt;
