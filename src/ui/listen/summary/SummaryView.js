@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { ensureMarkdown, renderMarkdownToString, highlightCodeBlocks } from '../../common/markdown/MarkdownRenderer.js';
 
 export class SummaryView extends LitElement {
     static styles = css`
@@ -249,15 +250,10 @@ export class SummaryView extends LitElement {
         };
         this.isVisible = true;
         this.hasCompletedRecording = false;
-
-        // 마크다운 라이브러리 초기화
-        this.marked = null;
-        this.hljs = null;
-        this.isLibrariesLoaded = false;
-        this.DOMPurify = null;
-        this.isDOMPurifyLoaded = false;
-
-        this.loadLibraries();
+        this.markdownReady = ensureMarkdown({ katex: true }).catch(error => {
+            console.error('[SummaryView] Failed to initialize markdown renderer:', error);
+            return null;
+        });
     }
 
     connectedCallback() {
@@ -288,119 +284,46 @@ export class SummaryView extends LitElement {
         this.requestUpdate();
     }
 
-    async loadLibraries() {
-        try {
-            if (!window.marked) {
-                await this.loadScript('../../../assets/marked-4.3.0.min.js');
-            }
-
-            if (!window.hljs) {
-                await this.loadScript('../../../assets/highlight-11.9.0.min.js');
-            }
-
-            if (!window.DOMPurify) {
-                await this.loadScript('../../../assets/dompurify-3.0.7.min.js');
-            }
-
-            this.marked = window.marked;
-            this.hljs = window.hljs;
-            this.DOMPurify = window.DOMPurify;
-
-            if (this.marked && this.hljs) {
-                this.marked.setOptions({
-                    highlight: (code, lang) => {
-                        if (lang && this.hljs.getLanguage(lang)) {
-                            try {
-                                return this.hljs.highlight(code, { language: lang }).value;
-                            } catch (err) {
-                                console.warn('Highlight error:', err);
-                            }
-                        }
-                        try {
-                            return this.hljs.highlightAuto(code).value;
-                        } catch (err) {
-                            console.warn('Auto highlight error:', err);
-                        }
-                        return code;
-                    },
-                    breaks: true,
-                    gfm: true,
-                    pedantic: false,
-                    smartypants: false,
-                    xhtml: false,
-                });
-
-                this.isLibrariesLoaded = true;
-                console.log('Markdown libraries loaded successfully');
-            }
-
-            if (this.DOMPurify) {
-                this.isDOMPurifyLoaded = true;
-                console.log('DOMPurify loaded successfully in SummaryView');
-            }
-        } catch (error) {
-            console.error('Failed to load libraries:', error);
-        }
-    }
-
-    loadScript(src) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = src;
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    }
-
-    parseMarkdown(text) {
-        if (!text) return '';
-
-        if (!this.isLibrariesLoaded || !this.marked) {
-            return text;
-        }
-
-        try {
-            return this.marked(text);
-        } catch (error) {
-            console.error('Markdown parsing error:', error);
-            return text;
-        }
-    }
-
     handleMarkdownClick(originalText) {
         this.handleRequestClick(originalText);
     }
 
-    renderMarkdownContent() {
-        if (!this.isLibrariesLoaded || !this.marked) {
+    async renderMarkdownContent() {
+        const ready = await this.markdownReady;
+        if (!ready || !ready.marked) {
             return;
         }
 
-        const markdownElements = this.shadowRoot.querySelectorAll('[data-markdown-id]');
-        markdownElements.forEach(element => {
+        const markdownElements = this.shadowRoot?.querySelectorAll('[data-markdown-id]');
+        if (!markdownElements || markdownElements.length === 0) {
+            return;
+        }
+
+        await Promise.all(Array.from(markdownElements).map(async element => {
             const originalText = element.getAttribute('data-original-text');
-            if (originalText) {
-                try {
-                    let parsedHTML = this.parseMarkdown(originalText);
-
-                    if (this.isDOMPurifyLoaded && this.DOMPurify) {
-                        parsedHTML = this.DOMPurify.sanitize(parsedHTML);
-
-                        if (this.DOMPurify.removed && this.DOMPurify.removed.length > 0) {
-                            console.warn('Unsafe content detected in insights, showing plain text');
-                            element.textContent = '⚠️ ' + originalText;
-                            return;
-                        }
-                    }
-
-                    element.innerHTML = parsedHTML;
-                } catch (error) {
-                    console.error('Error rendering markdown for element:', error);
-                    element.textContent = originalText;
-                }
+            if (!originalText) {
+                return;
             }
-        });
+
+            try {
+                const { html, removed } = await renderMarkdownToString(originalText, {
+                    latex: true,
+                    returnMeta: true,
+                });
+
+                if (removed.length > 0) {
+                    console.warn('[SummaryView] Unsafe markdown content removed; falling back to plain text.');
+                    element.textContent = '⚠️ ' + originalText;
+                    return;
+                }
+
+                element.innerHTML = html;
+                highlightCodeBlocks(element);
+            } catch (error) {
+                console.error('[SummaryView] Error rendering markdown element:', error);
+                element.textContent = originalText;
+            }
+        }));
     }
 
     async handleRequestClick(requestText) {

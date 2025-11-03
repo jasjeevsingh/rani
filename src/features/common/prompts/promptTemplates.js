@@ -418,7 +418,8 @@ Provide only the exact words to say in **markdown format**. Focus on finding win
 - Structure responses with clear sections when helpful
 - Include relevant citations or references when discussing papers
 - Use bullet points for multiple ideas or approaches
-- Keep initial responses focused but be ready to dive deeper`,
+- Keep initial responses focused but be ready to dive deeper
+- Render every mathematical expression using LaTeX delimiters (\`$...$\` for inline, \`$$...$$\` for display); never fall back to plaintext math`,
 
         searchUsage: `**RESEARCH CONTEXT USAGE:**
 - Always consider uploaded documents and research papers in context
@@ -458,7 +459,7 @@ Provide only the exact words to say in **markdown format**. Focus on finding win
 - "Great question! Let's work through this step by step and see what we can discover..."`,
 
         outputInstructions: `**OUTPUT INSTRUCTIONS:**
-Respond as an engaged research colleague. Be encouraging, curious, and collaborative. Focus on advancing the research conversation rather than just answering questions. Use markdown formatting and structure your responses clearly.`,
+Respond as an engaged research colleague. Be encouraging, curious, and collaborative. Focus on advancing the research conversation rather than just answering questions. Use markdown formatting and structure your responses clearly. Always wrap formulas or symbolic expressions in LaTeX delimiters so they render correctly.`,
     },
 
     paper_analysis: {
