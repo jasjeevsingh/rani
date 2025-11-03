@@ -334,9 +334,59 @@ function createStreamingLLM({
     };
 }
 
+function createEmbeddingClient({
+    model = 'qwen3-embedding:8b',
+    baseUrl = 'http://localhost:11434',
+} = {}) {
+    if (!model) {
+        throw new Error('Model parameter is required for Ollama embeddings.');
+    }
+
+    const embedOnce = async (inputText) => {
+        const prompt = typeof inputText === 'string' ? inputText : String(inputText ?? '');
+        if (!prompt.trim()) {
+            throw new Error('Cannot generate embedding for empty text content.');
+        }
+
+        return await requestQueue.add(async () => {
+            const response = await fetch(`${baseUrl}/api/embeddings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model,
+                    prompt,
+                })
+            });
+
+            if (!response.ok) {
+                const body = await response.text().catch(() => '');
+                throw new Error(`Ollama embeddings error (${response.status} ${response.statusText}): ${body}`);
+            }
+
+            const data = await response.json();
+            if (!Array.isArray(data.embedding)) {
+                throw new Error('Ollama embeddings response did not include an embedding vector.');
+            }
+
+            return data.embedding;
+        });
+    };
+
+    return {
+        embedTexts: async (texts = []) => {
+            const results = [];
+            for (const text of texts) {
+                results.push(await embedOnce(text));
+            }
+            return results;
+        }
+    };
+}
+
 module.exports = {
     OllamaProvider,
     createLLM,
     createStreamingLLM,
+    createEmbeddingClient,
     convertMessagesToOllamaFormat
 }; 

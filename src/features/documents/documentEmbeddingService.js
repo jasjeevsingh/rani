@@ -1,5 +1,8 @@
-const modelStateService = require('../common/services/modelStateService');
+const fetch = require('node-fetch');
 const { createEmbeddingClient } = require('../common/ai/factory');
+
+const DEFAULT_OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '');
+const DEFAULT_EMBEDDING_MODEL = process.env.RANI_EMBEDDING_MODEL || 'qwen3-embedding:8b';
 
 /**
  * Service responsible for generating and storing embeddings for document chunks
@@ -13,43 +16,35 @@ class DocumentEmbeddingService {
         return this.dbClient.getDb();
     }
 
-    getDefaultEmbeddingModel(provider) {
-        const normalized = provider === 'openai-glass' ? 'openai' : provider;
-        switch (normalized) {
-            case 'openai':
-                return process.env.RANI_EMBEDDING_MODEL || 'text-embedding-3-small';
-            default:
-                return null;
-        }
-    }
-
     vectorToBuffer(vector) {
         const floatArray = Float32Array.from(vector || []);
         return Buffer.from(floatArray.buffer);
     }
 
     async getEmbeddingContext() {
-        const providerInfo = await modelStateService.getCurrentModelInfo('llm');
-        if (!providerInfo || !providerInfo.apiKey) {
-            console.warn('[DocumentEmbeddingService] No LLM provider configured for embeddings.');
-            return { success: false, reason: 'missing-provider' };
-        }
-
-        const provider = providerInfo.provider;
-        const embeddingModel = this.getDefaultEmbeddingModel(provider);
-        if (!embeddingModel) {
-            console.warn(`[DocumentEmbeddingService] Embeddings not supported for provider: ${provider}.`);
-            return { success: false, reason: 'unsupported-provider', provider };
-        }
-
         try {
-            const client = createEmbeddingClient(provider, {
-                apiKey: providerInfo.apiKey,
-                model: embeddingModel
+            const baseUrl = DEFAULT_OLLAMA_BASE_URL;
+            const healthResponse = await fetch(`${baseUrl}/api/tags`);
+            if (!healthResponse.ok) {
+                console.warn(`[DocumentEmbeddingService] Failed to reach Ollama at ${baseUrl}. Status: ${healthResponse.status}`);
+                return { success: false, reason: 'ollama-unreachable', baseUrl, status: healthResponse.status };
+            }
+
+            const tags = await healthResponse.json().catch(() => null);
+            const models = Array.isArray(tags?.models) ? tags.models : [];
+            const hasModel = models.some(entry => entry?.name === DEFAULT_EMBEDDING_MODEL);
+            if (!hasModel) {
+                console.warn(`[DocumentEmbeddingService] Embedding model "${DEFAULT_EMBEDDING_MODEL}" is not installed in Ollama.`);
+                return { success: false, reason: 'model-not-installed', baseUrl, model: DEFAULT_EMBEDDING_MODEL };
+            }
+
+            const client = createEmbeddingClient('ollama', {
+                baseUrl,
+                model: DEFAULT_EMBEDDING_MODEL,
             });
-            return { success: true, client, provider, model: embeddingModel };
+            return { success: true, client, provider: 'ollama', model: DEFAULT_EMBEDDING_MODEL };
         } catch (error) {
-            console.error('[DocumentEmbeddingService] Failed to initialize embedding client:', error);
+            console.error('[DocumentEmbeddingService] Failed to initialize Ollama embedding client:', error);
             return { success: false, reason: 'client-init-failed', error };
         }
     }
@@ -115,7 +110,7 @@ class DocumentEmbeddingService {
         const context = await this.getEmbeddingContext();
         if (!context.success) {
             console.warn(`[DocumentEmbeddingService] Skipping chunk embedding: ${context.reason}`);
-            return { success: false, processed: 0, skipped: true, reason: context.reason };
+            return { success: false, processed: 0, skipped: true, reason: context.reason, details: context };
         }
 
         const { client, provider, model: embeddingModel } = context;

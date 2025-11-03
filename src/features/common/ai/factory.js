@@ -80,7 +80,9 @@ const PROVIDERS = {
       handler: () => require("./providers/ollama"),
       llmModels: [], // Dynamic models populated from installed Ollama models
       sttModels: [], // Ollama doesn't support STT yet
-      embeddingModels: [],
+      embeddingModels: [
+          { id: 'qwen3-embedding:8b', name: 'Qwen3 Embedding 8B' },
+      ],
   },
   'whisper': {
       name: 'Whisper (Local)',
