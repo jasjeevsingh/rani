@@ -6,6 +6,7 @@ const internalBridge = require('../../bridge/internalBridge');
 const AskSttService = require('./stt/askSttService');
 const sqliteClient = require('../common/services/sqliteClient');
 const DocumentRetrievalService = require('../documents/documentRetrievalService');
+const settingsService = require('../settings/settingsService');
 
 const getWindowPool = () => {
     try {
@@ -436,8 +437,22 @@ class AskService {
             }
             console.log(`[AskService] Using model: ${modelInfo.model} for provider: ${modelInfo.provider}`);
 
-            const screenshotResult = await captureScreenshot({ quality: 'medium' });
+            // Check screenshot toggle setting before capturing
+            const screenshotEnabled = await settingsService.getScreenshotEnabled();
+            console.log(`[AskService] Screenshot toggle is ${screenshotEnabled ? 'enabled' : 'disabled'}`);
+            
+            const screenshotResult = screenshotEnabled 
+                ? await captureScreenshot({ quality: 'medium' })
+                : { success: false, base64: null };
             const screenshotBase64 = screenshotResult.success ? screenshotResult.base64 : null;
+            
+            if (screenshotEnabled && screenshotBase64) {
+                console.log('[AskService] Screenshot captured and will be sent with message');
+            } else if (screenshotEnabled) {
+                console.log('[AskService] Screenshot enabled but capture failed');
+            } else {
+                console.log('[AskService] Screenshot disabled, no screen data will be sent');
+            }
 
             // Start parallel conversational response generation if in voice mode
             let conversationalPromise = null;

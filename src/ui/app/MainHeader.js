@@ -8,7 +8,8 @@ export class MainHeader extends LitElement {
         sidebarOpen: { type: Boolean, state: true },
         listenButtonState: { type: String, state: true },
         isListenActive: { type: Boolean, state: true },
-        isResearchActive: { type: Boolean, state: true }
+        isResearchActive: { type: Boolean, state: true },
+        screenshotEnabled: { type: Boolean, state: true }
     };
 
     static styles = css`
@@ -164,6 +165,61 @@ export class MainHeader extends LitElement {
                 100% {
                     box-shadow: 0 0 0 0 rgba(0, 122, 255, 0);
                 }
+            }
+
+            /* Screenshot Toggle Button */
+            #screenshot-btn {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                border: 1.5px solid rgba(255, 255, 255, 0.3);
+                background: transparent;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                padding: 0;
+                position: relative;
+                overflow: hidden;
+            }
+
+            #screenshot-btn:hover {
+                background: rgba(255, 255, 255, 0.1);
+                border-color: rgba(255, 255, 255, 0.5);
+            }
+
+            #screenshot-btn svg {
+                width: 20px;
+                height: 20px;
+                fill: none;
+                stroke: white;
+                stroke-width: 2;
+                transition: all 0.2s ease;
+                position: relative;
+                z-index: 2;
+            }
+
+            #screenshot-btn:hover svg {
+                stroke: #ffffff;
+            }
+
+            #screenshot-btn.active {
+                background: rgba(16, 185, 129, 0.2);
+                border-color: rgba(16, 185, 129, 0.6);
+            }
+
+            #screenshot-btn.active svg {
+                stroke: rgb(16, 185, 129);
+            }
+
+            #screenshot-btn.disabled {
+                background: rgba(239, 68, 68, 0.2);
+                border-color: rgba(239, 68, 68, 0.6);
+            }
+
+            #screenshot-btn.disabled svg {
+                stroke: rgb(239, 68, 68);
             }
 
             .research-indicator {
@@ -356,6 +412,7 @@ export class MainHeader extends LitElement {
         this.listenButtonState = 'Listen';
         this.isListenActive = false;
         this.isResearchActive = false;
+        this.screenshotEnabled = true; // Default to enabled
         this._handleResize = this._handleResize.bind(this);
         
         // Ensure window starts with transparent background since sidebar starts closed
@@ -437,6 +494,9 @@ export class MainHeader extends LitElement {
         super.connectedCallback();
         // AskView handles its own message sending and receiving
         
+        // Load screenshot toggle state
+        this._loadScreenshotToggleState();
+        
         // Listen for session state changes from backend
         if (window.api && window.api.mainHeader && window.api.mainHeader.onListenChangeSessionResult) {
             window.api.mainHeader.onListenChangeSessionResult((event, data) => {
@@ -516,6 +576,26 @@ export class MainHeader extends LitElement {
                                     <line x1="9" y1="14" x2="13" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                                 </svg>
                             </button>
+                            <button 
+                                id="screenshot-btn" 
+                                class="${this.screenshotEnabled ? 'active' : 'disabled'}" 
+                                title="${this.screenshotEnabled ? 'RANI can see your screen' : 'RANI can\'t see your screen'}" 
+                                @click="${this._handleScreenshotToggle}"
+                            >
+                                ${this.screenshotEnabled ? html`
+                                    <!-- Eye icon when enabled -->
+                                    <svg viewBox="0 0 24 24" fill="none">
+                                        <path d="M12 5C7 5 2.73 8.11 1 12.5 2.73 16.89 7 20 12 20s9.27-3.11 11-7.5C21.27 8.11 17 5 12 5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <circle cx="12" cy="12.5" r="3" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                ` : html`
+                                    <!-- Eye-off icon when disabled -->
+                                    <svg viewBox="0 0 24 24" fill="none">
+                                        <path d="M3 3l18 18M10.5 10.7a3 3 0 1 0 4.2 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M7.3 7.3C4.1 9.1 2 12 2 12s3 6 10 6c1.5 0 3-.3 4.3-.8M12 6c4 0 7.3 2.6 9 6-.5 1-1 1.8-1.7 2.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                `}
+                            </button>
                             <button id="settings-btn" title="Settings" @click="${this._openSettings}">
                                 <svg viewBox="0 0 4 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M2.0013 0.664062C1.82449 0.664062 1.65492 0.7343 1.5299 0.859325C1.40487 0.984349 1.33464 1.15392 1.33464 1.33073C1.33464 1.50754 1.40487 1.67711 1.5299 1.80213C1.65492 1.92716 1.82449 1.9974 2.0013 1.9974C2.17811 1.9974 2.34768 1.92716 2.47271 1.80213C2.59773 1.67711 2.66797 1.50754 2.66797 1.33073C2.66797 1.15392 2.59773 0.984349 2.47271 0.859325C2.34768 0.734301 2.17811 0.664062 2.0013 0.664062ZM2.0013 5.33073C1.82449 5.33073 1.65492 5.40097 1.5299 5.52599C1.40487 5.65102 1.33464 5.82058 1.33464 5.9974C1.33464 6.17421 1.40487 6.34378 1.5299 6.4688C1.65492 6.59382 1.82449 6.66406 2.0013 6.66406C2.17811 6.66406 2.34768 6.59382 2.47271 6.4688C2.59773 6.34378 2.66797 6.17421 2.66797 5.9974C2.66797 5.82058 2.59773 5.65102 2.47271 5.52599C2.34768 5.40097 2.17811 5.33073 2.0013 5.33073ZM2.0013 9.9974C1.82449 9.9974 1.65492 10.0676 1.5299 10.1927C1.40487 10.3177 1.33464 10.4873 1.33464 10.6641C1.33464 10.8409 1.40487 11.0104 1.5299 11.1355C1.65492 11.2605 1.82449 11.3307 2.0013 11.3307C2.17811 11.3307 2.34768 11.2605 2.47271 11.1355C2.59773 11.0104 2.66797 10.8409 2.66797 10.6641C2.66797 10.4873 2.59773 10.3177 2.47271 10.1927C2.34768 10.0676 2.17811 9.9974 2.0013 9.9974Z" fill="white" stroke="white" stroke-linecap="round" stroke-linejoin="round"/>
@@ -578,6 +658,39 @@ export class MainHeader extends LitElement {
             }
         } else {
             console.error('[MainHeader] sendResearchButtonClick not available on window.api.mainHeader');
+        }
+    }
+
+    async _loadScreenshotToggleState() {
+        if (window.api && window.api.mainHeader && window.api.mainHeader.getScreenshotEnabled) {
+            try {
+                const result = await window.api.mainHeader.getScreenshotEnabled();
+                if (result && typeof result.enabled === 'boolean') {
+                    this.screenshotEnabled = result.enabled;
+                    this.requestUpdate();
+                }
+            } catch (error) {
+                console.error('[MainHeader] Error loading screenshot toggle state:', error);
+            }
+        }
+    }
+
+    async _handleScreenshotToggle() {
+        console.log('[MainHeader] Screenshot toggle clicked, current state:', this.screenshotEnabled);
+        if (window.api && window.api.mainHeader && window.api.mainHeader.toggleScreenshot) {
+            try {
+                const result = await window.api.mainHeader.toggleScreenshot();
+                console.log('[MainHeader] Screenshot toggle result:', result);
+                
+                if (result && typeof result.enabled === 'boolean') {
+                    this.screenshotEnabled = result.enabled;
+                    this.requestUpdate();
+                }
+            } catch (error) {
+                console.error('[MainHeader] Error toggling screenshot:', error);
+            }
+        } else {
+            console.error('[MainHeader] toggleScreenshot not available on window.api.mainHeader');
         }
     }
     

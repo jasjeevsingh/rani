@@ -420,6 +420,28 @@ async function setAutoUpdateSetting(isEnabled) {
     }
 }
 
+async function getScreenshotEnabled() {
+    try {
+        const settings = await getSettings();
+        // Default to true if not set
+        return settings.screenshotEnabled !== undefined ? settings.screenshotEnabled : true;
+    } catch (error) {
+        console.error('[SettingsService] Error getting screenshot enabled:', error);
+        return true; // Fallback to enabled
+    }
+}
+
+async function setScreenshotEnabled(enabled) {
+    try {
+        const settings = await getSettings();
+        settings.screenshotEnabled = enabled;
+        return await saveSettings(settings);
+    } catch (error) {
+        console.error('[SettingsService] Error setting screenshot enabled:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 function initialize() {
     // cleanup 
     windowNotificationManager.cleanup();
@@ -456,6 +478,8 @@ module.exports = {
     updateContentProtection,
     getAutoUpdateSetting,
     setAutoUpdateSetting,
+    getScreenshotEnabled,
+    setScreenshotEnabled,
     // Model settings facade
     getModelSettings,
     clearApiKey,

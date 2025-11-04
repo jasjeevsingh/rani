@@ -99,6 +99,22 @@ module.exports = {
         return await windowBridge.toggleResearchView();
     });
     
+    // Screenshot toggle
+    ipcMain.handle('screenshot:toggle', async () => {
+        const settingsService = require('../features/settings/settingsService');
+        const currentState = await settingsService.getScreenshotEnabled();
+        const newState = !currentState;
+        await settingsService.setScreenshotEnabled(newState);
+        console.log(`[FeatureBridge] Screenshot toggled: ${currentState} -> ${newState}`);
+        return { success: true, enabled: newState };
+    });
+    
+    ipcMain.handle('screenshot:getEnabled', async () => {
+        const settingsService = require('../features/settings/settingsService');
+        const enabled = await settingsService.getScreenshotEnabled();
+        return { success: true, enabled };
+    });
+    
     // Listen
     ipcMain.handle('listen:sendMicAudio', async (event, { data, mimeType }) => await listenService.handleSendMicAudioContent(data, mimeType));
     ipcMain.handle('listen:sendSystemAudio', async (event, { data, mimeType }) => {

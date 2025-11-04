@@ -120,6 +120,8 @@ contextBridge.exposeInMainWorld('api', {
     sendAskButtonClick: () => ipcRenderer.invoke('ask:toggleAskButton'),
     sendResearchButtonClick: () => ipcRenderer.invoke('research:toggleResearchView'),
     sendToggleAllWindowsVisibility: () => ipcRenderer.invoke('shortcut:toggleAllWindowsVisibility'),
+    toggleScreenshot: () => ipcRenderer.invoke('screenshot:toggle'),
+    getScreenshotEnabled: () => ipcRenderer.invoke('screenshot:getEnabled'),
     
     // Listeners
     onListenChangeSessionResult: (callback) => ipcRenderer.on('listen:changeSessionResult', callback),
