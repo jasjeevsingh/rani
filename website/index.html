@@ -48,9 +48,9 @@
                 <div class="nav-links">
                     <a href="#features" class="nav-link">Features</a>
                     <a href="#pricing" class="nav-link">Pricing</a>
+                    <a href="#privacy" class="nav-link">Privacy</a>
                     <a href="#use-cases" class="nav-link">Use Cases</a>
                     <a href="mailto:jasjeev@upenn.edu" class="nav-link">Contact</a>
-                    <a href="#pricing" class="btn btn-primary btn-sm">Try RANI v1.0</a>
                 </div>
                 <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
                     <span></span>
@@ -65,10 +65,24 @@
     <div class="mobile-menu" id="mobileMenu">
         <a href="#features" class="mobile-menu-link">Features</a>
         <a href="#pricing" class="mobile-menu-link">Pricing</a>
+        <a href="#privacy" class="mobile-menu-link">Privacy</a>
         <a href="#use-cases" class="mobile-menu-link">Use Cases</a>
         <a href="mailto:jasjeev@upenn.edu" class="mobile-menu-link">Contact</a>
-        <a href="#pricing" class="mobile-menu-link">Try RANI v1.0</a>
     </div>
+
+    <!-- Dark Mode Toggle -->
+    <button class="theme-toggle" id="themeToggle" onclick="toggleDarkMode()" aria-label="Toggle dark mode">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+        </svg>
+    </button>
+
+    <!-- Scroll to Top Button -->
+    <button class="scroll-to-top" id="scrollToTop" aria-label="Scroll to top">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+        </svg>
+    </button>
 
     <!-- Hero Section -->
     <section class="hero">
@@ -84,18 +98,38 @@
                 </p>
                 <div class="hero-cta">
                     <a href="#pricing" class="btn btn-primary btn-large">
-                        Try RANI v1.0
+                        Try RANI Free
                         <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M5 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </a>
                     <a href="mailto:jasjeev@upenn.edu?subject=RANI%20Demo%20Request&body=Hi%2C%0A%0AI'm%20interested%20in%20learning%20more%20about%20RANI%20and%20would%20like%20to%20schedule%20a%20demo.%0A%0AName%3A%20%0AInstitution%2FOrganization%3A%20%0AResearch%20Area%3A%20%0APreferred%20Time%3A%20%0A%0AThank%20you!" class="btn btn-secondary btn-large">
-                        <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                        </svg>
                         Request a Demo
                     </a>
                 </div>
+                
+                <!-- Hero Demo Carousel -->
+                <div class="hero-demo">
+                    <div class="hero-demo-carousel">
+                        <img src="assets/rani_demo_pic1.png" alt="RANI highlighting research papers and transcribing meetings" class="hero-demo-img active">
+                        <img src="assets/rani_demo_pic2.png" alt="RANI AI assistant in action" class="hero-demo-img">
+                    </div>
+                    <div class="carousel-dots">
+                        <button class="carousel-dot active" data-slide="0" aria-label="View slide 1"></button>
+                        <button class="carousel-dot" data-slide="1" aria-label="View slide 2"></button>
+                    </div>
+                    <button class="carousel-arrow carousel-prev" aria-label="Previous slide">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                    <button class="carousel-arrow carousel-next" aria-label="Next slide">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                
                 <div class="hero-stats">
                     <div class="stat">
                         <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -135,8 +169,20 @@
         </div>
     </section>
 
+    <!-- Institutional Badges Section -->
+    <section class="institutional-section">
+        <div class="container">
+            <h3 class="section-title">Used By Researchers At</h3>
+            <div class="institutional-badges">
+                <img src="assets/upenn_logo.png" alt="University of Pennsylvania" class="institutional-logo">
+            </div>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
     <!-- Features Grid -->
-    <section id="features" class="features">
+    <section id="features" class="features scroll-snap-section">
         <div class="container">
             <div class="section-header">
                 <h2 class="section-title">Everything You Need for Research</h2>
@@ -396,8 +442,62 @@
         </div>
     </section>
 
+    <div class="section-divider"></div>
+
+    <!-- Testimonials Section -->
+    <section class="testimonials">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">What Researchers Are Saying</h2>
+                <p class="section-subtitle">Join researchers who are accelerating their work with RANI</p>
+            </div>
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <p class="testimonial-quote">
+                        Finally, an AI that actually understands my research workflow. The screen context feature is game-changing for my literature reviews.
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">SK</div>
+                        <div class="testimonial-info">
+                            <div class="testimonial-name">Sarah Kim</div>
+                            <div class="testimonial-role">PhD Candidate, Computer Science</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <p class="testimonial-quote">
+                        The meeting transcription paired with document search has transformed how I collaborate with my research group. We never lose track of ideas anymore.
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">MR</div>
+                        <div class="testimonial-info">
+                            <div class="testimonial-name">Dr. Michael Rodriguez</div>
+                            <div class="testimonial-role">Associate Professor, Biology</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <p class="testimonial-quote">
+                        As an undergraduate, RANI helped me understand dense academic papers and build my first research project. The free tier is perfect for students.
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">AP</div>
+                        <div class="testimonial-info">
+                            <div class="testimonial-name">Alex Patel</div>
+                            <div class="testimonial-role">Undergraduate, Physics</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
     <!-- Comparison Section -->
-    <section class="comparison">
+    <section class="comparison scroll-snap-section">
         <div class="container">
             <div class="section-header">
                 <h2 class="section-title">Why Choose RANI?</h2>
@@ -431,20 +531,80 @@
                 </div>
                 <div class="comparison-row">
                     <div class="comparison-cell label">Cost</div>
-                    <div class="comparison-cell">❌ Monthly subscription</div>
-                    <div class="comparison-cell highlight">✅ Free & open source</div>
+                    <div class="comparison-cell">❌ Expensive subscriptions</div>
+                    <div class="comparison-cell highlight">✅ From free to $30/month</div>
                 </div>
                 <div class="comparison-row">
                     <div class="comparison-cell label">Customization</div>
-                    <div class="comparison-cell">❌ Closed source</div>
-                    <div class="comparison-cell highlight">✅ Fully customizable</div>
+                    <div class="comparison-cell">❌ One-size-fits-all</div>
+                    <div class="comparison-cell highlight">✅ Flexible AI model choice</div>
                 </div>
             </div>
         </div>
     </section>
 
+    <div class="section-divider"></div>
+
+    <!-- Privacy Statement Section -->
+    <section id="privacy" class="privacy-section">
+        <div class="container">
+            <div class="privacy-content">
+                <svg class="privacy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M12 8v4M12 16h.01"/>
+                </svg>
+                <h2>Your Research, Your Data</h2>
+                <p>
+                    RANI is built with privacy at its core. Your documents, conversations, and research data 
+                    stay on your device. No cloud storage, no data mining, no third-party access.
+                </p>
+                <p>
+                    When you use cloud AI providers (OpenAI, Anthropic), only the specific content you query 
+                    is sent—never your entire library. Our free tier uses 100% local processing with Ollama.
+                </p>
+                <div class="privacy-features">
+                    <div class="privacy-feature">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+                            <line x1="12" y1="12" x2="12" y2="22.08"/>
+                        </svg>
+                        <div class="privacy-feature-title">Local-First Storage</div>
+                        <div class="privacy-feature-desc">All documents stored on your device</div>
+                    </div>
+                    <div class="privacy-feature">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                        <div class="privacy-feature-title">Encrypted Data</div>
+                        <div class="privacy-feature-desc">End-to-end encryption for cloud features</div>
+                    </div>
+                    <div class="privacy-feature">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                            <line x1="3" y1="3" x2="21" y2="21" stroke-width="2"/>
+                        </svg>
+                        <div class="privacy-feature-title">No Tracking</div>
+                        <div class="privacy-feature-desc">Zero analytics or telemetry</div>
+                    </div>
+                    <div class="privacy-feature">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
+                        <div class="privacy-feature-title">Your Control</div>
+                        <div class="privacy-feature-desc">Choose which AI providers to use</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
     <!-- Use Cases Section -->
-    <section id="use-cases" class="use-cases">
+    <section id="use-cases" class="use-cases scroll-snap-section">
         <div class="container">
             <div class="section-header">
                 <h2 class="section-title">Built for Your Workflow</h2>
