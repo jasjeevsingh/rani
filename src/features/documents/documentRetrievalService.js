@@ -59,24 +59,35 @@ class DocumentRetrievalService {
     }
 
     async search({ query, documentIds = [], limit = 5, candidateLimit = 100, minScore = 0.15 } = {}) {
+        console.log(`[DocumentRetrievalService] search() called with query="${query?.substring(0, 80)}", documentIds=${documentIds.length}, limit=${limit}, minScore=${minScore}`);
+        
         if (!query || !query.trim()) {
+            console.log(`[DocumentRetrievalService] Empty query, returning no results`);
             return { success: false, results: [], reason: 'empty-query' };
         }
 
+        console.log(`[DocumentRetrievalService] Embedding query...`);
         const embeddingResult = await this.embeddingService.embedQuery(query);
+        console.log(`[DocumentRetrievalService] Embedding result: success=${embeddingResult.success}, reason=${embeddingResult.reason || 'n/a'}, provider=${embeddingResult.provider}, model=${embeddingResult.model}`);
+        
         if (!embeddingResult.success) {
             console.warn(`[DocumentRetrievalService] Query embedding unavailable: ${embeddingResult.reason}`);
             return { success: false, results: [], reason: embeddingResult.reason || 'embedding-failed' };
         }
 
+        console.log(`[DocumentRetrievalService] Fetching candidate chunks (limit=${Math.max(candidateLimit, limit * 4)})...`);
         const candidateRows = this.fetchCandidateChunks(documentIds, Math.max(candidateLimit, limit * 4));
         console.log(`[DocumentRetrievalService] Retrieved ${candidateRows.length} candidate chunks for retrieval.`);
+        
         if (!candidateRows.length) {
+            console.log(`[DocumentRetrievalService] No candidate chunks found, returning empty results`);
             return { success: true, results: [], provider: embeddingResult.provider, model: embeddingResult.model };
         }
 
         const queryVector = Float32Array.from(embeddingResult.embedding || []);
+        console.log(`[DocumentRetrievalService] Query vector dimension: ${queryVector.length}`);
 
+        console.log(`[DocumentRetrievalService] Scoring ${candidateRows.length} chunks...`);
         const scored = candidateRows
             .map(row => {
                 try {
@@ -102,9 +113,14 @@ class DocumentRetrievalService {
             .filter(Boolean)
             .sort((a, b) => b.score - a.score);
 
+        console.log(`[DocumentRetrievalService] Scored ${scored.length} chunks successfully`);
+        console.log(`[DocumentRetrievalService] Top 5 scores: ${scored.slice(0, 5).map(s => s.score.toFixed(3)).join(', ')}`);
+
         let results = scored
             .filter(item => item.score >= minScore)
             .slice(0, limit);
+
+        console.log(`[DocumentRetrievalService] ${results.length} chunks met minScore threshold (${minScore})`);
 
         if (results.length === 0 && scored.length > 0) {
             console.log('[DocumentRetrievalService] No chunks met minScore threshold; falling back to top-ranked items.');
@@ -112,6 +128,7 @@ class DocumentRetrievalService {
         }
 
         console.log(`[DocumentRetrievalService] Returning ${results.length} chunks (top score=${results[0]?.score?.toFixed?.(3) ?? 'n/a'})`);
+        console.log(`[DocumentRetrievalService] Result preview: ${results.map((r, i) => `[${i+1}] doc=${r.documentId.substring(0,8)} score=${r.score.toFixed(3)} content="${r.content.substring(0, 50)}..."`).join('\n')}`);
 
         return {
             success: true,

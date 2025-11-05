@@ -444,7 +444,58 @@ class ResearchService {
                 throw new Error('Paper not found');
             }
             
-            // Find associated document by checking metadata
+            // Check if paper has a PDF file but no document_id (needs import)
+            if (paper.file_path && !paper.document_id) {
+                console.log(`[ResearchService] Paper has PDF but no document, importing: ${paper.file_path}`);
+                
+                const fs = require('fs');
+                if (!fs.existsSync(paper.file_path)) {
+                    throw new Error('PDF file not found on disk');
+                }
+                
+                // Import the PDF as a document
+                const document = await this.documentService.importDocument(paper.file_path, userId, {
+                    isPaper: true,
+                    paperId: paperId,
+                    source: paper.source || 'zotero',
+                    zoteroKey: paper.zotero_key,
+                    doi: paper.doi,
+                    arxivId: paper.arxiv_id
+                });
+                
+                if (document && document.id) {
+                    // Update paper with document_id
+                    this.db.getDb().prepare(
+                        'UPDATE research_papers SET document_id = ? WHERE id = ?'
+                    ).run(document.id, paperId);
+                    
+                    console.log(`[ResearchService] PDF imported as document ${document.id}`);
+                    
+                    return {
+                        success: true,
+                        paperId,
+                        documentId: document.id,
+                        processed: document.chunkCount || 0
+                    };
+                } else {
+                    throw new Error('Failed to import PDF as document');
+                }
+            }
+            
+            // If paper has document_id, use it directly
+            if (paper.document_id) {
+                console.log(`[ResearchService] Generating embeddings for existing document ${paper.document_id}`);
+                const result = await this.documentService.generateEmbeddingsForDocument(paper.document_id);
+                
+                return {
+                    success: true,
+                    paperId,
+                    documentId: paper.document_id,
+                    ...result
+                };
+            }
+            
+            // Legacy fallback: search for document by metadata
             const documents = this.db.getDb().prepare(
                 'SELECT id FROM documents WHERE uid = ?'
             ).all(userId);
@@ -469,7 +520,7 @@ class ResearchService {
             }
             
             if (!documentId) {
-                throw new Error('No document found for this paper');
+                throw new Error('No PDF available for this paper. Please download it first.');
             }
             
             // Generate embeddings

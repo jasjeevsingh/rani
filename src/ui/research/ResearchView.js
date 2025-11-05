@@ -875,6 +875,27 @@ export class ResearchView extends LitElement {
             this.loadSinglePaperStatus(paper.id);
         }
         
+        // Check if paper has no PDF file (not just no embedding)
+        const hasNoPdf = !paper.file_path || paper.file_path.trim() === '';
+        const hasArxivId = paper.arxiv_id && paper.arxiv_id.length > 0;
+        const canDownloadFromArxiv = hasNoPdf && hasArxivId;
+        
+        // Check if paper has PDF but needs embedding
+        const hasPdfNeedsEmbedding = paper.file_path && !paper.document_id;
+        
+        // Debug logging
+        console.log('[ResearchView] Paper card:', {
+            title: paper.title.substring(0, 50),
+            status: status.status,
+            file_path: paper.file_path,
+            document_id: paper.document_id,
+            arxiv_id: paper.arxiv_id,
+            hasNoPdf,
+            hasArxivId,
+            canDownloadFromArxiv,
+            hasPdfNeedsEmbedding
+        });
+        
         return html`
             <div class="document-item" style="display: block;">
                 <div style="cursor: pointer;" @click=${() => this.openPaper(paper)}>
@@ -889,7 +910,18 @@ export class ResearchView extends LitElement {
                 </div>
                 
                 <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                    ${(status.status === 'pending' || status.status === 'failed' || status.status === 'partial' || status.status === 'loading') ? html`
+                    ${canDownloadFromArxiv ? html`
+                        <button 
+                            class="secondary-button"
+                            @click=${(e) => { e.stopPropagation(); this.downloadFromArxiv(paper); }}
+                            title="Download PDF from arXiv"
+                            style="background: #b31b1b; color: white;"
+                        >
+                            📥 Download from arXiv
+                        </button>
+                    ` : ''}
+                    
+                    ${(hasPdfNeedsEmbedding || status.status === 'pending' || status.status === 'failed' || status.status === 'partial' || status.status === 'no-document') ? html`
                         <button 
                             class="secondary-button"
                             @click=${(e) => { e.stopPropagation(); this.embedPaper(paper); }}
@@ -1288,6 +1320,36 @@ export class ResearchView extends LitElement {
         } catch (error) {
             console.error('Embedding generation failed:', error);
             this.embeddingStatuses[paper.id] = { status: 'failed', error: error.message };
+            this.requestUpdate();
+        }
+    }
+
+    async downloadFromArxiv(paper) {
+        try {
+            console.log('[ResearchView] Downloading from arXiv:', paper.arxiv_id);
+            
+            // Update UI to show downloading state
+            this.embeddingStatuses[paper.id] = { status: 'loading' };
+            this.requestUpdate();
+            
+            const result = await window.api.research.downloadFromArxiv(paper.id);
+            
+            if (result.success) {
+                // Refresh paper data and status
+                await this.loadPapers();
+                await this.loadSinglePaperStatus(paper.id);
+                console.log('[ResearchView] arXiv download successful');
+            } else {
+                console.error('[ResearchView] arXiv download failed:', result.error);
+                this.embeddingStatuses[paper.id] = { status: 'no-document' };
+                alert(`Failed to download from arXiv: ${result.error || 'Unknown error'}`);
+            }
+            
+            this.requestUpdate();
+        } catch (error) {
+            console.error('[ResearchView] arXiv download error:', error);
+            this.embeddingStatuses[paper.id] = { status: 'no-document' };
+            alert(`Error downloading from arXiv: ${error.message}`);
             this.requestUpdate();
         }
     }

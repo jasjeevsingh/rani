@@ -81,7 +81,8 @@ const PROVIDERS = {
       llmModels: [], // Dynamic models populated from installed Ollama models
       sttModels: [], // Ollama doesn't support STT yet
       embeddingModels: [
-          { id: 'qwen3-embedding:8b', name: 'Qwen3 Embedding 8B' },
+          { id: 'nomic-embed-text', name: 'Nomic Embed Text' },
+          { id: 'qwen3-embedding:8b', name: 'Qwen3 Embedding 8B (slower)' },
       ],
   },
   'whisper': {

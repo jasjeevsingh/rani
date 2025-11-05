@@ -129,11 +129,15 @@ class DocumentService {
 
             if (chunkCount > 0) {
                 try {
+                    console.log(`[DocumentService] Starting embedding generation for ${chunkCount} chunks...`);
                     embeddingSummary = await this.embeddingService.embedDocument(documentId, { limit: chunkCount });
                     console.log('[DocumentService] Embedding summary:', embeddingSummary);
                 } catch (embeddingError) {
                     console.error('[DocumentService] Failed to generate embeddings:', embeddingError);
+                    console.error('[DocumentService] Embedding error stack:', embeddingError.stack);
                 }
+            } else {
+                console.log('[DocumentService] No chunks generated, skipping embeddings');
             }
 
             return {

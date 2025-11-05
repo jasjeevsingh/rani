@@ -335,7 +335,7 @@ function createStreamingLLM({
 }
 
 function createEmbeddingClient({
-    model = 'qwen3-embedding:8b',
+    model = 'nomic-embed-text',
     baseUrl = 'http://localhost:11434',
 } = {}) {
     if (!model) {
@@ -349,26 +349,47 @@ function createEmbeddingClient({
         }
 
         return await requestQueue.add(async () => {
-            const response = await fetch(`${baseUrl}/api/embeddings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model,
-                    prompt,
-                })
-            });
+            console.log(`[Ollama] Sending embedding request to ${baseUrl}/api/embeddings`);
+            
+            const controller = new AbortController();
+            // Increase timeout to 120 seconds for embedding generation
+            const timeout = setTimeout(() => {
+                console.error('[Ollama] Embedding request timed out after 120s');
+                controller.abort();
+            }, 120000);
 
-            if (!response.ok) {
-                const body = await response.text().catch(() => '');
-                throw new Error(`Ollama embeddings error (${response.status} ${response.statusText}): ${body}`);
+            try {
+                const response = await fetch(`${baseUrl}/api/embeddings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model,
+                        prompt,
+                    }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeout);
+
+                if (!response.ok) {
+                    const body = await response.text().catch(() => '');
+                    throw new Error(`Ollama embeddings error (${response.status} ${response.statusText}): ${body}`);
+                }
+
+                const data = await response.json();
+                if (!Array.isArray(data.embedding)) {
+                    throw new Error('Ollama embeddings response did not include an embedding vector.');
+                }
+
+                console.log(`[Ollama] Received embedding vector of dimension ${data.embedding.length}`);
+                return data.embedding;
+            } catch (error) {
+                clearTimeout(timeout);
+                if (error.name === 'AbortError') {
+                    throw new Error('Ollama embedding request timed out');
+                }
+                throw error;
             }
-
-            const data = await response.json();
-            if (!Array.isArray(data.embedding)) {
-                throw new Error('Ollama embeddings response did not include an embedding vector.');
-            }
-
-            return data.embedding;
         });
     };
 

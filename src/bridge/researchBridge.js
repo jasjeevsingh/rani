@@ -134,7 +134,11 @@ class ResearchBridge {
                 
                 // Get embedding status
                 getPaperEmbeddingStatus: (paperId) => 
-                    window.api.invoke('research:getPaperEmbeddingStatus', paperId)
+                    window.api.invoke('research:getPaperEmbeddingStatus', paperId),
+                
+                // Download paper from arXiv
+                downloadFromArxiv: (paperId) => 
+                    window.api.invoke('research:downloadFromArxiv', paperId)
             }
         };
     }

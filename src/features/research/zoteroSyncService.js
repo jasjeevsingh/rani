@@ -349,6 +349,7 @@ class ZoteroSyncService {
                 att.data.filename?.endsWith('.pdf')
             );
 
+            // If no PDF in Zotero, just log and return
             if (pdfAttachments.length === 0) {
                 console.log(`[ZoteroSyncService] No PDF attachments found for ${zoteroKey}`);
                 return;
@@ -371,16 +372,20 @@ class ZoteroSyncService {
                 
                 fs.writeFileSync(filePath, pdfBuffer);
                 
-                // Update paper with file path
-                const query = `
+                console.log(`[ZoteroSyncService] Downloaded PDF: ${filename}`);
+                
+                // Just update file path - embedding will be done manually via UI button
+                const updateQuery = `
                     UPDATE research_papers
                     SET file_path = ?, pdf_url = ?
                     WHERE id = ?
                 `;
                 
-                this.db.getDb().prepare(query).run(filePath, pdfAttachment.data.url, paperId);
-                
-                console.log(`[ZoteroSyncService] Downloaded PDF: ${filename}`);
+                this.db.getDb().prepare(updateQuery).run(
+                    filePath, 
+                    pdfAttachment.data.url,
+                    paperId
+                );
                 
             } catch (error) {
                 console.error(`[ZoteroSyncService] Failed to download PDF for ${zoteroKey}:`, error);
@@ -388,6 +393,71 @@ class ZoteroSyncService {
 
         } catch (error) {
             console.error(`[ZoteroSyncService] Failed to sync attachments:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Download PDF from arXiv as fallback when Zotero doesn't have it
+     * @param {string} uid - User ID
+     * @param {string} paperId - Paper ID
+     * @param {string} arxivId - arXiv ID
+     * @param {string} title - Paper title (for filename)
+     * @returns {Promise<void>}
+     */
+    async downloadFromArxiv(uid, paperId, arxivId, title) {
+        const https = require('https');
+        
+        try {
+            const arxivUrl = `https://arxiv.org/pdf/${arxivId}.pdf`;
+            console.log(`[ZoteroSyncService] Downloading from arXiv: ${arxivUrl}`);
+            
+            return new Promise((resolve, reject) => {
+                https.get(arxivUrl, (response) => {
+                    if (response.statusCode === 200) {
+                        const chunks = [];
+                        
+                        response.on('data', (chunk) => {
+                            chunks.push(chunk);
+                        });
+                        
+                        response.on('end', async () => {
+                            try {
+                                const pdfBuffer = Buffer.concat(chunks);
+                                
+                                // Save PDF to disk
+                                const safeTitle = title.replace(/[^a-z0-9]/gi, '_').substring(0, 100);
+                                const filename = `${safeTitle}_${arxivId}.pdf`;
+                                const filePath = path.join(this.zoteroDir, filename);
+                                
+                                fs.writeFileSync(filePath, pdfBuffer);
+                                console.log(`[ZoteroSyncService] Downloaded arXiv PDF: ${filename}`);
+                                
+                                // Just update file path - embedding will be done manually via UI button
+                                const updateQuery = `
+                                    UPDATE research_papers
+                                    SET file_path = ?, pdf_url = ?
+                                    WHERE id = ?
+                                `;
+                                
+                                this.db.getDb().prepare(updateQuery).run(filePath, arxivUrl, paperId);
+                                
+                                resolve();
+                            } catch (error) {
+                                reject(error);
+                            }
+                        });
+                        
+                        response.on('error', reject);
+                    } else {
+                        console.error(`[ZoteroSyncService] arXiv download failed with status ${response.statusCode}`);
+                        reject(new Error(`HTTP ${response.statusCode}`));
+                    }
+                }).on('error', reject);
+            });
+            
+        } catch (error) {
+            console.error(`[ZoteroSyncService] Failed to download from arXiv:`, error);
             throw error;
         }
     }

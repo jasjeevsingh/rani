@@ -390,9 +390,16 @@ class ZoteroService {
      * Download file from Zotero
      * @param {string} url - File URL
      * @param {string} apiKey - Zotero API key
+     * @param {number} redirectCount - Internal redirect counter
      * @returns {Promise<Buffer>} File buffer
      */
-    async downloadFile(url, apiKey) {
+    async downloadFile(url, apiKey, redirectCount = 0) {
+        const MAX_REDIRECTS = 5;
+        
+        if (redirectCount >= MAX_REDIRECTS) {
+            throw new Error('Too many redirects');
+        }
+
         return new Promise((resolve, reject) => {
             const options = {
                 headers: {
@@ -402,6 +409,23 @@ class ZoteroService {
             };
 
             https.get(url, options, (res) => {
+                // Follow redirects (301, 302, 303, 307, 308)
+                if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
+                    const redirectUrl = res.headers.location;
+                    if (!redirectUrl) {
+                        reject(new Error(`Redirect ${res.statusCode} without location header`));
+                        return;
+                    }
+                    
+                    console.log(`[ZoteroService] Following redirect (${res.statusCode}) to: ${redirectUrl}`);
+                    
+                    // Follow the redirect
+                    this.downloadFile(redirectUrl, apiKey, redirectCount + 1)
+                        .then(resolve)
+                        .catch(reject);
+                    return;
+                }
+                
                 if (res.statusCode === 200) {
                     const chunks = [];
                     

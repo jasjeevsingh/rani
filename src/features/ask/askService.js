@@ -420,15 +420,28 @@ class AskService {
             if (useRAG) {
                 try {
                     console.log(`[AskService:RAG] ✅ Research Library ENABLED - Searching document chunks for query: "${userPrompt.substring(0, 80)}"`);
+                    const retrievalStartTime = Date.now();
                     const retrievalResult = await this.retrievalService.search({
                         query: userPrompt,
                         limit: 5
                     });
+                    const retrievalDuration = Date.now() - retrievalStartTime;
+                    console.log(`[AskService:RAG] ⏱️  Retrieval took ${retrievalDuration}ms`);
+                    
                     if (retrievalResult.success) {
                         retrievedChunks = retrievalResult.results;
                         console.log(`[AskService:RAG] Retrieved ${retrievedChunks.length} chunks (provider=${retrievalResult.provider}, model=${retrievalResult.model})`);
+                        console.log(`[AskService:RAG] Chunk preview:`, retrievedChunks.map((c, i) => ({
+                            index: i + 1,
+                            score: c.score?.toFixed(3),
+                            docId: c.document_id,
+                            title: c.metadata?.title?.substring(0, 50) || 'untitled',
+                            contentPreview: c.content?.substring(0, 100) || ''
+                        })));
                         this.state.retrievalResults = retrievedChunks;
+                        console.log(`[AskService:RAG] ✅ Set retrievalResults in state (${retrievedChunks.length} items)`);
                         this._broadcastState();
+                        console.log(`[AskService:RAG] ✅ Broadcasted state with retrievalResults`);
                     } else {
                         console.warn(`[AskService:RAG] Retrieval skipped: ${retrievalResult.reason}`);
                         this.state.retrievalResults = [];
@@ -496,7 +509,10 @@ class AskService {
             const retrievalContextMessage = this.buildRetrievedContextMessage(retrievedChunks);
             if (retrievalContextMessage) {
                 console.log(`[AskService:RAG] Injecting retrieval context into prompt (${retrievedChunks.length} chunks).`);
+                console.log(`[AskService:RAG] Context message preview (first 500 chars):`, retrievalContextMessage.substring(0, 500));
                 messages.splice(1, 0, { role: 'system', content: retrievalContextMessage });
+            } else {
+                console.log(`[AskService:RAG] No retrieval context to inject (retrievedChunks.length=${retrievedChunks.length})`);
             }
             
             const streamingLLM = createStreamingLLM(modelInfo.provider, {
@@ -667,6 +683,8 @@ class AskService {
         } finally {
             this.state.isStreaming = false;
             this.state.currentResponse = fullResponse;
+            console.log(`[AskService:Stream] 📊 Final response length: ${fullResponse.length} chars`);
+            console.log(`[AskService:Stream] 📊 retrievalResults in state: ${this.state.retrievalResults?.length || 0} items`);
             this._broadcastState();
             
             if (fullResponse) {

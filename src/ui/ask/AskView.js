@@ -3239,6 +3239,17 @@ export class AskView extends LitElement {
 
     willUpdate(changedProperties) {
         if (changedProperties.has('retrievalResults')) {
+            console.log(`[AskView:UI] 📥 retrievalResults changed:`, {
+                oldLength: changedProperties.get('retrievalResults')?.length || 0,
+                newLength: this.retrievalResults?.length || 0,
+                hasResults: Boolean(this.retrievalResults && this.retrievalResults.length > 0),
+                preview: this.retrievalResults?.map((c, i) => ({
+                    index: i,
+                    score: c.score,
+                    title: c.metadata?.title?.substring(0, 40)
+                }))
+            });
+            
             const conversationContainer = this.shadowRoot?.querySelector('.conversation-container');
             if (conversationContainer) {
                 this._prevConversationScrollTop = conversationContainer.scrollTop;
@@ -3611,13 +3622,26 @@ export class AskView extends LitElement {
     }
 
     renderRetrievalContext() {
+        console.log(`[AskView:UI] 🔍 renderRetrievalContext() called - retrievalResults:`, {
+            hasResults: Boolean(this.retrievalResults),
+            length: this.retrievalResults?.length || 0,
+            preview: this.retrievalResults?.slice(0, 2).map(c => ({
+                score: c.score,
+                title: c.metadata?.title,
+                contentLength: c.content?.length
+            }))
+        });
+        
         if (!this.retrievalResults || this.retrievalResults.length === 0) {
+            console.log(`[AskView:UI] ⚠️  No retrieval results to display`);
             return null;
         }
 
         const total = this.retrievalResults.length;
         const items = this.retrievalResults.slice(0, 1);
         const usingCount = Math.min(5, total);
+        
+        console.log(`[AskView:UI] ✅ Rendering retrieval footnote with ${items.length} visible item(s) out of ${total} total`);
 
         return html`
             <div class="retrieval-footnote">

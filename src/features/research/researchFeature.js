@@ -155,6 +155,32 @@ class ResearchFeature {
             return await this.researchService.getPaperEmbeddingStatus(paperId, userId);
         });
 
+        // Download paper from arXiv
+        this.ipc.handle('research:downloadFromArxiv', async (paperId) => {
+            const userId = await this.getCurrentUserId();
+            
+            // Get paper info
+            const paper = this.db.getDb().prepare(
+                'SELECT arxiv_id, title FROM research_papers WHERE id = ? AND uid = ?'
+            ).get(paperId, userId);
+            
+            if (!paper) {
+                return { success: false, error: 'Paper not found' };
+            }
+            
+            if (!paper.arxiv_id) {
+                return { success: false, error: 'No arXiv ID available for this paper' };
+            }
+            
+            try {
+                await this.zoteroSyncService.downloadFromArxiv(userId, paperId, paper.arxiv_id, paper.title);
+                return { success: true };
+            } catch (error) {
+                console.error('[ResearchFeature] arXiv download failed:', error);
+                return { success: false, error: error.message };
+            }
+        });
+
         // Zotero integration handlers
         this.ipc.handle('zotero:testConnection', async (apiKey, userId, libraryType) => {
             console.log('[ResearchFeature] IPC handler received:', {
