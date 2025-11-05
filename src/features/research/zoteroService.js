@@ -23,16 +23,42 @@ class ZoteroService {
      */
     async testConnection(apiKey, userId, libraryType = 'user') {
         try {
-            const url = `${this.baseUrl}/${libraryType}s/${userId}`;
-            const response = await this.makeRequest(url, apiKey);
+            console.log('[ZoteroService] Testing connection:', {
+                userId,
+                libraryType,
+                apiKeyLength: apiKey ? apiKey.length : 0,
+                apiKeyStart: apiKey ? apiKey.substring(0, 8) + '...' : 'none'
+            });
             
+            // First, verify the API key itself using /keys/current endpoint
+            const keyUrl = `${this.baseUrl}/keys/current`;
+            console.log('[ZoteroService] Verifying API key at:', keyUrl);
+            const keyInfo = await this.makeRequest(keyUrl, apiKey);
+            console.log('[ZoteroService] API key verified. Key info:', {
+                userID: keyInfo.userID,
+                username: keyInfo.username,
+                access: keyInfo.access
+            });
+            
+            // Now test library access by fetching a limited number of items
+            const itemsUrl = `${this.baseUrl}/${libraryType}s/${userId}/items?limit=1`;
+            console.log('[ZoteroService] Testing library access at:', itemsUrl);
+            
+            const response = await this.makeRequest(itemsUrl, apiKey);
+            
+            console.log('[ZoteroService] Connection test succeeded');
             return {
                 success: true,
-                libraryInfo: response,
-                message: 'Successfully connected to Zotero'
+                keyInfo: keyInfo,
+                libraryAccessible: true,
+                message: `Successfully connected to Zotero as ${keyInfo.username}`
             };
         } catch (error) {
             console.error('[ZoteroService] Connection test failed:', error);
+            console.error('[ZoteroService] Error details:', {
+                message: error.message,
+                stack: error.stack
+            });
             return {
                 success: false,
                 error: error.message,
@@ -283,6 +309,8 @@ class ZoteroService {
      */
     async makeRequest(url, apiKey) {
         return new Promise((resolve, reject) => {
+            console.log('[ZoteroService] Making request to:', url);
+            
             const options = {
                 headers: {
                     'Zotero-API-Key': apiKey,
@@ -291,23 +319,34 @@ class ZoteroService {
             };
 
             https.get(url, options, (res) => {
+                console.log('[ZoteroService] Response status:', res.statusCode);
+                console.log('[ZoteroService] Response headers:', res.headers);
+                
                 let data = '';
                 
                 res.on('data', chunk => data += chunk);
                 
                 res.on('end', () => {
+                    console.log('[ZoteroService] Response received, length:', data.length);
+                    
                     if (res.statusCode === 200) {
                         try {
                             const parsed = JSON.parse(data);
                             resolve(parsed);
                         } catch (error) {
+                            console.error('[ZoteroService] JSON parse error:', error);
                             reject(new Error('Failed to parse Zotero API response'));
                         }
                     } else {
+                        console.error('[ZoteroService] Non-200 status code:', res.statusCode);
+                        console.error('[ZoteroService] Response data:', data);
                         reject(new Error(`Zotero API error: ${res.statusCode} - ${data}`));
                     }
                 });
-            }).on('error', reject);
+            }).on('error', (error) => {
+                console.error('[ZoteroService] HTTP request error:', error);
+                reject(error);
+            });
         });
     }
 

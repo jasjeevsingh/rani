@@ -1399,6 +1399,23 @@ export class ResearchView extends LitElement {
     }
 
     async handleZoteroTestConnection() {
+        // Debug: Check what's in the input field DOM element
+        const userIdInput = this.shadowRoot.querySelector('#zotero-user-id');
+        const userIdFromDOM = userIdInput ? userIdInput.value : 'not found';
+        
+        console.log('[ResearchView] === ZOTERO CONNECTION TEST DEBUG ===');
+        console.log('[ResearchView] Component properties:', {
+            apiKey: this.zoteroApiKey ? `${this.zoteroApiKey.substring(0, 8)}...` : 'none',
+            userId: this.zoteroUserId,
+            libraryType: this.zoteroLibraryType
+        });
+        console.log('[ResearchView] DOM input field value:', userIdFromDOM);
+        console.log('[ResearchView] About to call testConnection with:', {
+            param1_apiKey: this.zoteroApiKey ? `${this.zoteroApiKey.substring(0, 8)}...` : 'none',
+            param2_userId: this.zoteroUserId,
+            param3_libraryType: this.zoteroLibraryType
+        });
+        
         if (!this.zoteroApiKey || !this.zoteroUserId || this.zoteroApiKey === '••••••••') {
             this.showZoteroStatus('Please enter your API key and User ID', 'error');
             return;
@@ -1420,6 +1437,7 @@ export class ResearchView extends LitElement {
                 this.showZoteroStatus(result.message || 'Connection failed', 'error');
             }
         } catch (error) {
+            console.error('[ResearchView] Test connection error:', error);
             this.showZoteroStatus('Failed to connect to Zotero. Please check your credentials.', 'error');
         } finally {
             this.isLoading = false;

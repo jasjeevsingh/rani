@@ -36,27 +36,27 @@ class ResearchFeature {
 
     setupIpcHandlers() {
         // Document management
-        this.ipc.handle('documents:import', async (event, filePath, metadata = {}) => {
+        this.ipc.handle('documents:import', async (filePath, metadata = {}) => {
             const userId = await this.getCurrentUserId();
             return await this.documentService.importDocument(filePath, userId, metadata);
         });
 
-        this.ipc.handle('documents:getUserDocuments', async (event, limit = 50) => {
+        this.ipc.handle('documents:getUserDocuments', async (limit = 50) => {
             const userId = await this.getCurrentUserId();
             return await this.documentService.getUserDocuments(userId, limit);
         });
 
-        this.ipc.handle('documents:search', async (event, searchTerm, limit = 20) => {
+        this.ipc.handle('documents:search', async (searchTerm, limit = 20) => {
             const userId = await this.getCurrentUserId();
             return await this.documentService.searchDocuments(userId, searchTerm, limit);
         });
 
-        this.ipc.handle('documents:getDocument', async (event, documentId) => {
+        this.ipc.handle('documents:getDocument', async (documentId) => {
             const userId = await this.getCurrentUserId();
             return await this.documentService.getDocument(documentId, userId);
         });
 
-        this.ipc.handle('documents:deleteDocument', async (event, documentId) => {
+        this.ipc.handle('documents:deleteDocument', async (documentId) => {
             const userId = await this.getCurrentUserId();
             return await this.documentService.deleteDocument(documentId, userId);
         });
@@ -156,11 +156,16 @@ class ResearchFeature {
         });
 
         // Zotero integration handlers
-        this.ipc.handle('zotero:testConnection', async (event, apiKey, userId, libraryType) => {
+        this.ipc.handle('zotero:testConnection', async (apiKey, userId, libraryType) => {
+            console.log('[ResearchFeature] IPC handler received:', {
+                apiKey: apiKey ? `${apiKey.substring(0, 8)}...` : 'none',
+                userId,
+                libraryType
+            });
             return await this.zoteroService.testConnection(apiKey, userId, libraryType);
         });
 
-        this.ipc.handle('zotero:saveCredentials', async (event, apiKey, zoteroUserId, libraryType) => {
+        this.ipc.handle('zotero:saveCredentials', async (apiKey, zoteroUserId, libraryType) => {
             const uid = await this.getCurrentUserId();
             return await this.zoteroService.saveCredentials(uid, apiKey, zoteroUserId, libraryType);
         });
@@ -175,7 +180,7 @@ class ResearchFeature {
             return await this.zoteroService.deleteCredentials(uid);
         });
 
-        this.ipc.handle('zotero:syncLibrary', async (event, options = {}) => {
+        this.ipc.handle('zotero:syncLibrary', async (options = {}) => {
             const uid = await this.getCurrentUserId();
             return await this.zoteroSyncService.syncLibrary(uid, options);
         });

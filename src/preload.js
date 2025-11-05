@@ -419,7 +419,27 @@ contextBridge.exposeInMainWorld('api', {
     
     // Get user's imported papers
     getUserPapers: (limit = 50) => 
-      ipcRenderer.invoke('research:getUserPapers', limit)
+      ipcRenderer.invoke('research:getUserPapers', limit),
+    
+    // Delete a paper
+    deletePaper: (paperId) =>
+      ipcRenderer.invoke('research:deletePaper', paperId),
+    
+    // Open paper file
+    openPaperFile: (filePath) =>
+      ipcRenderer.invoke('research:openPaperFile', filePath),
+    
+    // Generate embeddings for paper
+    generatePaperEmbeddings: (paperId) =>
+      ipcRenderer.invoke('research:generatePaperEmbeddings', paperId),
+    
+    // Generate embeddings for all pending papers
+    generateAllPendingEmbeddings: () =>
+      ipcRenderer.invoke('research:generateAllPendingEmbeddings'),
+    
+    // Get embedding status
+    getPaperEmbeddingStatus: (paperId) =>
+      ipcRenderer.invoke('research:getPaperEmbeddingStatus', paperId)
   },
 
   // Zotero integration API
