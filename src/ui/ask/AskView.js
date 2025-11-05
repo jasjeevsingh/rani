@@ -22,6 +22,8 @@ export class AskView extends LitElement {
         conversationHistory: { type: Array },
         retrievalResults: { type: Array },
         embedded: { type: Boolean }, // New: Embedded mode flag for sidebar
+        useResearchLibrary: { type: Boolean, state: true }, // RAG toggle state
+        textareaValue: { type: String, state: true }, // For send button visibility
     };
 
     static styles = css`
@@ -308,9 +310,9 @@ export class AskView extends LitElement {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 16px;
-            background: transparent;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             flex-shrink: 0;
         }
 
@@ -326,9 +328,9 @@ export class AskView extends LitElement {
         }
 
         .response-icon {
-            width: 20px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.2);
+            width: 18px;
+            height: 18px;
+            background: rgba(59, 130, 246, 0.15);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -337,15 +339,15 @@ export class AskView extends LitElement {
         }
 
         .response-icon svg {
-            width: 12px;
-            height: 12px;
-            stroke: rgba(255, 255, 255, 0.9);
+            width: 11px;
+            height: 11px;
+            stroke: rgb(96, 165, 250);
         }
 
         .response-label {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 500;
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.85);
             white-space: nowrap;
             position: relative;
             overflow: hidden;
@@ -373,28 +375,64 @@ export class AskView extends LitElement {
         .header-right {
             display: flex;
             align-items: center;
-            gap: 8px;
-            flex: 1;
-            justify-content: flex-end;
-        }
-
-        .question-text {
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.7);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 300px;
-            margin-right: 8px;
+            gap: 4px;
+            flex-shrink: 0;
         }
 
         .header-controls {
             display: flex;
-            gap: 8px;
+            gap: 4px;
             align-items: center;
             flex-shrink: 0;
         }
 
+        /* Modern header icon buttons */
+        .header-icon-btn {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+            border: none;
+            padding: 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 26px;
+            height: 26px;
+            transition: background-color 0.15s ease, color 0.15s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-icon-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .header-icon-btn svg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+        }
+
+        .header-icon-btn .check-icon {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.5);
+        }
+
+        .header-icon-btn.copied .copy-icon {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.5);
+        }
+
+        .header-icon-btn.copied .check-icon {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Legacy styles - keeping for backwards compatibility */
         .copy-button {
             background: transparent;
             color: rgba(255, 255, 255, 0.9);
@@ -909,6 +947,251 @@ export class AskView extends LitElement {
             }
         }
 
+        /* ═══════════════════════════════════════════════════════════ */
+        /* Modern Chat Input Area - VS Code Copilot/Cursor Style */
+        /* ═══════════════════════════════════════════════════════════ */
+
+        /* Context Pills Container (above textarea) */
+        .context-pills-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 12px 4px 12px;
+            max-height: 80px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            transition: max-height 0.2s ease-out, opacity 0.2s ease-out;
+        }
+
+        .context-pills-container:empty {
+            display: none;
+        }
+
+        .context-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.9);
+            animation: slideInFromRight 0.2s ease-out;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .context-pill:hover {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .context-pill-remove {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.15s ease;
+            padding: 0;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .context-pill-remove:hover {
+            opacity: 1;
+        }
+
+        @keyframes slideInFromRight {
+            from {
+                transform: translateX(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Modern Textarea */
+        #textArea {
+            flex: 1;
+            min-height: 40px;
+            max-height: 200px;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            outline: none;
+            color: white;
+            font-size: 14px;
+            line-height: 1.5;
+            font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-weight: 400;
+            resize: none;
+            overflow-y: auto;
+            transition: border-color 0.15s ease, height 0.2s ease;
+            will-change: height;
+        }
+
+        #textArea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        #textArea:focus {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        #textArea:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Input Wrapper - Contains textarea and toolbar */
+        .input-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            flex-shrink: 0;
+        }
+
+        .textarea-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        /* Action Toolbar (voice, research library, send buttons) */
+        .action-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            align-self: flex-end;
+        }
+
+        /* Icon buttons in toolbar */
+        .toolbar-icon-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .toolbar-icon-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .toolbar-icon-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .toolbar-icon-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* Research Library button - filled state when active */
+        .toolbar-icon-btn.research-library.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: rgb(96, 165, 250);
+        }
+
+        .toolbar-icon-btn.research-library.active:hover {
+            background: rgba(59, 130, 246, 0.3);
+        }
+
+        /* Voice button - red pulse when active */
+        .toolbar-icon-btn.voice.listening {
+            background: rgba(220, 38, 38, 0.2);
+            border-color: rgba(239, 68, 68, 0.6);
+            color: rgb(239, 68, 68);
+            animation: voicePulse 2s infinite;
+        }
+
+        @keyframes voicePulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        /* Send button - larger, blue, animated appearance */
+        .toolbar-send-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 50%;
+            background: rgb(59, 130, 246);
+            color: white;
+            cursor: pointer;
+            transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), 
+                        opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                        background 0.15s ease;
+            padding: 0;
+            flex-shrink: 0;
+            transform-origin: center;
+        }
+
+        .toolbar-send-btn.hidden {
+            transform: scale(0.8);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .toolbar-send-btn.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .toolbar-send-btn:hover:not(:disabled) {
+            background: rgb(37, 99, 235);
+            transform: scale(1.05);
+        }
+
+        .toolbar-send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: rgba(59, 130, 246, 0.5);
+        }
+
+        .toolbar-send-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2.5;
+        }
+
+        /* ═══════════════════════════════════════════════════════════ */
+
         /* Conversation History Styles */
         .conversation-container {
             flex: 1 1 0; /* Grow to fill space, shrink to 0 if needed */
@@ -1080,6 +1363,10 @@ export class AskView extends LitElement {
         this.retrievalResults = [];
         this._prevConversationScrollTop = null;
         this._wasNearBottomBeforeRetrieval = true;
+        
+        // New: Modern chat UI state
+        this.useResearchLibrary = false; // RAG toggle - default OFF
+        this.textareaValue = ''; // Track textarea content for send button visibility
 
         // TTS chunking state
         this.isChunkedTTSActive = false;
@@ -1113,6 +1400,9 @@ export class AskView extends LitElement {
         this.handleCloseAskWindow = this.handleCloseAskWindow.bind(this);
         this.handleCloseIfNoContent = this.handleCloseIfNoContent.bind(this);
         this.handleMicClick = this.handleMicClick.bind(this);
+        this.handleToggleResearchLibrary = this.handleToggleResearchLibrary.bind(this);
+        this.handleTextareaInput = this.handleTextareaInput.bind(this);
+        this.handleRemoveContext = this.handleRemoveContext.bind(this);
 
         this.loadLibraries();
 
@@ -1131,6 +1421,9 @@ export class AskView extends LitElement {
             console.log('[AskView] Embedded mode detected - loading conversation history');
             this.loadConversationHistory();
         }
+        
+        // Load Research Library setting from persistent storage
+        this.loadResearchLibrarySetting();
         
         document.addEventListener('keydown', this.handleEscKey);
 
@@ -2422,11 +2715,24 @@ export class AskView extends LitElement {
     }
 
     async handleSendText(e, overridingText = '') {
+        // Get text from textarea (new) or textInput (legacy fallback)
+        const textarea = this.shadowRoot?.getElementById('textArea');
         const textInput = this.shadowRoot?.getElementById('textInput');
-        const text = (overridingText || textInput?.value || '').trim();
-        // if (!text) return;
+        const inputElement = textarea || textInput;
+        const text = (overridingText || inputElement?.value || '').trim();
+        
+        // Don't send empty messages unless Research Library is active
+        if (!text && !this.useResearchLibrary) return;
 
-        textInput.value = '';
+        // Clear input
+        if (inputElement) {
+            inputElement.value = '';
+            this.textareaValue = '';
+            // Reset textarea height
+            if (textarea) {
+                textarea.style.height = '40px';
+            }
+        }
 
         // Add user message to conversation history
         if (text) {
@@ -2475,7 +2781,9 @@ export class AskView extends LitElement {
         this.processingChunks = false;
         
         if (window.api) {
-            window.api.askView.sendMessage(text).catch(error => {
+            // Pass RAG state to backend
+            console.log(`[AskView] Sending message with RAG ${this.useResearchLibrary ? 'enabled' : 'disabled'}`);
+            window.api.askView.sendMessage(text, { useRAG: this.useResearchLibrary }).catch(error => {
                 console.error('Error sending text:', error);
             });
         }
@@ -2999,6 +3307,89 @@ export class AskView extends LitElement {
     firstUpdated() {
         setTimeout(() => this.adjustWindowHeight(), 200);
     }
+    
+    /**
+     * Toggle Research Library context for RAG system
+     */
+    async handleToggleResearchLibrary() {
+        this.useResearchLibrary = !this.useResearchLibrary;
+        console.log(`[AskView] Research Library ${this.useResearchLibrary ? 'enabled' : 'disabled'}`);
+        
+        // Save to settings via IPC
+        if (window.api && window.api.askView) {
+            try {
+                const result = await window.api.askView.toggleResearchLibrary();
+                if (result.success) {
+                    this.useResearchLibrary = result.enabled;
+                    console.log(`[AskView] Research Library setting saved: ${result.enabled}`);
+                }
+            } catch (error) {
+                console.error('[AskView] Failed to save Research Library setting:', error);
+            }
+        }
+        
+        this.requestUpdate();
+    }
+    
+    /**
+     * Load Research Library setting from persistent storage
+     */
+    async loadResearchLibrarySetting() {
+        if (window.api && window.api.askView) {
+            try {
+                const result = await window.api.askView.getResearchLibraryEnabled();
+                if (result.success) {
+                    this.useResearchLibrary = result.enabled;
+                    console.log(`[AskView] Research Library setting loaded: ${result.enabled}`);
+                    this.requestUpdate();
+                }
+            } catch (error) {
+                console.error('[AskView] Failed to load Research Library setting:', error);
+                // Fall back to default (false)
+                this.useResearchLibrary = false;
+            }
+        }
+    }
+    
+    /**
+     * Handle textarea input - track value for send button visibility
+     */
+    handleTextareaInput(e) {
+        this.textareaValue = e.target.value;
+        this.autoResizeTextarea(e.target);
+    }
+    
+    /**
+     * Auto-resize textarea as user types
+     */
+    autoResizeTextarea(textarea) {
+        if (!textarea) return;
+        
+        // Reset height to measure scrollHeight accurately
+        textarea.style.height = '40px';
+        
+        // Calculate new height within bounds
+        const newHeight = Math.max(40, Math.min(200, textarea.scrollHeight));
+        textarea.style.height = `${newHeight}px`;
+    }
+    
+    /**
+     * Remove context pill (Research Library)
+     */
+    handleRemoveContext(contextType) {
+        if (contextType === 'research') {
+            this.useResearchLibrary = false;
+            console.log('[AskView] Research Library context removed');
+            this.requestUpdate();
+        }
+    }
+    
+    /**
+     * Check if send button should be visible
+     */
+    get shouldShowSendButton() {
+        return this.textareaValue.trim().length > 0 || this.useResearchLibrary;
+    }
 
 
     getTruncatedQuestion(question, maxLength = 30) {
@@ -3022,29 +3413,34 @@ export class AskView extends LitElement {
 
         return html`
             <div class="ask-container">
-                <!-- Response Header -->
+                <!-- Modern Simplified Header -->
                 <div class="response-header ${!hasConversation ? 'hidden' : ''}">
                     <div class="header-left">
                         <div class="response-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                                <circle cx="12" cy="12" r="10" />
                                 <path d="M8 12l2 2 4-4" />
                             </svg>
                         </div>
                         <span class="response-label">${headerText}</span>
                     </div>
                     <div class="header-right">
-                        <span class="question-text">${this.getTruncatedQuestion(this.currentQuestion)}</span>
                         <div class="header-controls">
-                            <button class="copy-button ${this.copyState === 'copied' ? 'copied' : ''}" @click=${this.handleCopy}>
+                            <!-- Copy All Button -->
+                            <button 
+                                class="header-icon-btn ${this.copyState === 'copied' ? 'copied' : ''}" 
+                                @click=${this.handleCopy}
+                                title="Copy conversation"
+                                aria-label="Copy conversation to clipboard"
+                            >
                                 <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                                     <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                                 </svg>
                                 <svg
                                     class="check-icon"
-                                    width="16"
-                                    height="16"
+                                    width="14"
+                                    height="14"
                                     viewBox="0 0 24 24"
                                     fill="none"
                                     stroke="currentColor"
@@ -3053,12 +3449,35 @@ export class AskView extends LitElement {
                                     <path d="M20 6L9 17l-5-5" />
                                 </svg>
                             </button>
-                            <button class="close-button" @click=${this.handleCloseAskWindow}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
+                            
+                            <!-- Clear Chat Button -->
+                            <button 
+                                class="header-icon-btn" 
+                                @click=${this.clearResponseContent}
+                                title="Clear conversation"
+                                aria-label="Clear conversation history"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                    <line x1="10" y1="11" x2="10" y2="17"/>
+                                    <line x1="14" y1="11" x2="14" y2="17"/>
                                 </svg>
                             </button>
+                            
+                            <!-- Close Button (standalone mode only) -->
+                            ${!this.embedded ? html`
+                                <button 
+                                    class="header-icon-btn" 
+                                    @click=${this.handleCloseAskWindow}
+                                    title="Close"
+                                    aria-label="Close window"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
@@ -3095,51 +3514,96 @@ export class AskView extends LitElement {
                     ${this.renderRetrievalContext()}
                 </div>
 
-                <!-- Text Input Container -->
+                <!-- Modern Chat Input Area -->
                 <div class="text-input-container ${!hasConversation ? 'no-response' : ''} ${!this.showTextInput ? 'hidden' : ''}">
-                    <div style="display: flex; align-items: center; width: 100%;">
-                        <!-- Microphone Button -->
-                        <button
-                            class="mic-button ${this.isListening ? 'listening' : ''}"
-                            @click=${this.handleMicClick}
-                            title="${this.isListening ? 'Stop voice input' : 'Start voice input'}"
-                        >
-                            <!-- Voice activity indicator -->
-                            <div class="voice-indicator ${this.voiceActivity ? 'active' : ''}"></div>
-                            
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                ${this.isListening ? html`
-                                    <!-- Stop/Square icon when listening -->
-                                    <rect x="6" y="6" width="12" height="12" rx="2"/>
-                                ` : html`
-                                    <!-- Microphone icon when not listening -->
-                                    <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                                    <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-                                    <line x1="12" y1="19" x2="12" y2="23"/>
-                                    <line x1="8" y1="23" x2="16" y2="23"/>
-                                `}
-                            </svg>
-                        </button>
+                    <div class="input-wrapper">
+                        <!-- Context Pills (shown when Research Library is active) -->
+                        <div class="context-pills-container">
+                            ${this.useResearchLibrary ? html`
+                                <div class="context-pill">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                                    </svg>
+                                    <span>Research Library</span>
+                                    <button 
+                                        class="context-pill-remove" 
+                                        @click=${() => this.handleRemoveContext('research')}
+                                        title="Remove Research Library context"
+                                    >×</button>
+                                </div>
+                            ` : ''}
+                        </div>
 
-                        <input
-                            type="text"
-                            id="textInput"
-                            placeholder="${this.isListening ? 'Listening...' : ' Ask me anything!'}"
-                            @keydown=${this.handleTextKeydown}
-                            @focus=${this.handleInputFocus}
-                            ?disabled=${this.isListening}
-                            style="flex: 1;"
-                        />
-                        <button
-                            class="submit-btn"
-                            @click=${this.handleSendText}
-                            ?disabled=${this.isListening}
-                        >
-                            <span class="btn-label">Submit</span>
-                            <span class="btn-icon">
-                                ↵
-                            </span>
-                        </button>
+                        <!-- Textarea Row -->
+                        <div class="textarea-row">
+                            <textarea
+                                id="textArea"
+                                placeholder="${this.isListening ? 'Listening...' : 'Ask RANI...'}"
+                                @input=${this.handleTextareaInput}
+                                @keydown=${this.handleTextKeydown}
+                                ?disabled=${this.isListening}
+                                .value=${this.textareaValue}
+                            ></textarea>
+
+                            <!-- Action Toolbar -->
+                            <div class="action-toolbar">
+                                <!-- Voice Button -->
+                                <button
+                                    class="toolbar-icon-btn voice ${this.isListening ? 'listening' : ''}"
+                                    @click=${this.handleMicClick}
+                                    title="${this.isListening ? 'Stop voice input' : 'Start voice input'}"
+                                    ?disabled=${this.isLoading || this.isStreaming}
+                                >
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        ${this.isListening ? html`
+                                            <!-- Stop icon when listening -->
+                                            <rect x="6" y="6" width="12" height="12" rx="2"/>
+                                        ` : html`
+                                            <!-- Microphone icon -->
+                                            <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                                            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                                            <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
+                                            <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2"/>
+                                        `}
+                                    </svg>
+                                </button>
+
+                                <!-- Research Library Button -->
+                                <button
+                                    class="toolbar-icon-btn research-library ${this.useResearchLibrary ? 'active' : ''}"
+                                    @click=${this.handleToggleResearchLibrary}
+                                    title="${this.useResearchLibrary ? 'Disable Research Library' : 'Enable Research Library'}"
+                                    ?disabled=${this.isLoading || this.isStreaming}
+                                >
+                                    ${this.useResearchLibrary ? html`
+                                        <!-- Filled book icon when active -->
+                                        <svg viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                                        </svg>
+                                    ` : html`
+                                        <!-- Outline book icon when inactive -->
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                                        </svg>
+                                    `}
+                                </button>
+
+                                <!-- Send Button -->
+                                <button
+                                    class="toolbar-send-btn ${this.shouldShowSendButton ? 'visible' : 'hidden'}"
+                                    @click=${this.handleSendText}
+                                    ?disabled=${this.isLoading || this.isStreaming || this.isListening}
+                                    title="Send message (Enter)"
+                                >
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M12 19V5M5 12l7-7 7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

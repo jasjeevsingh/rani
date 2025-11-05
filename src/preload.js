@@ -158,7 +158,11 @@ contextBridge.exposeInMainWorld('api', {
     adjustWindowHeight: (winName, height) => ipcRenderer.invoke('adjust-window-height', { winName, height }),
     
     // Message Handling
-    sendMessage: (text) => ipcRenderer.invoke('ask:sendQuestionFromAsk', text),
+    sendMessage: (text, options) => ipcRenderer.invoke('ask:sendQuestionFromAsk', text, options),
+
+    // Research Library (RAG) Control
+    toggleResearchLibrary: () => ipcRenderer.invoke('researchLibrary:toggle'),
+    getResearchLibraryEnabled: () => ipcRenderer.invoke('researchLibrary:getEnabled'),
 
     // Voice Input
     startVoiceInput: () => ipcRenderer.invoke('ask:startVoiceInput'),

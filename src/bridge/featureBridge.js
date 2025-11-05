@@ -82,7 +82,7 @@ module.exports = {
     ipcMain.handle('ollama:enable-autostart', async () => await ollamaService.handleEnableAutoStart());
 
     // Ask
-    ipcMain.handle('ask:sendQuestionFromAsk', async (event, userPrompt) => await askService.sendMessage(userPrompt));
+    ipcMain.handle('ask:sendQuestionFromAsk', async (event, userPrompt, options = {}) => await askService.sendMessage(userPrompt, [], options));
     ipcMain.handle('ask:sendQuestionFromSummary', async (event, userPrompt) => await askService.sendMessage(userPrompt));
     ipcMain.handle('ask:toggleAskButton', async () => await askService.toggleAskButton());
     ipcMain.handle('ask:closeAskWindow',  async () => await askService.closeAskWindow());
@@ -112,6 +112,22 @@ module.exports = {
     ipcMain.handle('screenshot:getEnabled', async () => {
         const settingsService = require('../features/settings/settingsService');
         const enabled = await settingsService.getScreenshotEnabled();
+        return { success: true, enabled };
+    });
+    
+    // Research Library (RAG) toggle
+    ipcMain.handle('researchLibrary:toggle', async () => {
+        const settingsService = require('../features/settings/settingsService');
+        const currentState = await settingsService.getResearchLibraryEnabled();
+        const newState = !currentState;
+        await settingsService.setResearchLibraryEnabled(newState);
+        console.log(`[FeatureBridge] Research Library toggled: ${currentState} -> ${newState}`);
+        return { success: true, enabled: newState };
+    });
+    
+    ipcMain.handle('researchLibrary:getEnabled', async () => {
+        const settingsService = require('../features/settings/settingsService');
+        const enabled = await settingsService.getResearchLibraryEnabled();
         return { success: true, enabled };
     });
     

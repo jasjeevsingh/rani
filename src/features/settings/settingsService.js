@@ -442,6 +442,38 @@ async function setScreenshotEnabled(enabled) {
     }
 }
 
+/**
+ * Get Research Library (RAG) enabled state
+ * @returns {Promise<boolean>} Whether Research Library is enabled (default: false)
+ */
+async function getResearchLibraryEnabled() {
+    try {
+        const settings = await getSettings();
+        // Default to false - RAG disabled by default for privacy and performance
+        return settings.researchLibraryEnabled === true;
+    } catch (error) {
+        console.error('[SettingsService] Error getting research library enabled:', error);
+        return false; // Fallback to disabled
+    }
+}
+
+/**
+ * Set Research Library (RAG) enabled state
+ * @param {boolean} enabled - Whether to enable Research Library
+ * @returns {Promise<Object>} Save result
+ */
+async function setResearchLibraryEnabled(enabled) {
+    try {
+        const settings = await getSettings();
+        settings.researchLibraryEnabled = enabled;
+        console.log(`[SettingsService] Research Library ${enabled ? 'enabled' : 'disabled'}`);
+        return await saveSettings(settings);
+    } catch (error) {
+        console.error('[SettingsService] Error setting research library enabled:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 function initialize() {
     // cleanup 
     windowNotificationManager.cleanup();
@@ -480,6 +512,8 @@ module.exports = {
     setAutoUpdateSetting,
     getScreenshotEnabled,
     setScreenshotEnabled,
+    getResearchLibraryEnabled,
+    setResearchLibraryEnabled,
     // Model settings facade
     getModelSettings,
     clearApiKey,

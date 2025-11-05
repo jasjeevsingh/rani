@@ -362,7 +362,12 @@ class AskService {
      * @param {string} userPrompt
      * @returns {Promise<{success: boolean, response?: string, error?: string}>}
      */
-    async sendMessage(userPrompt, conversationHistoryRaw=[]) {
+    async sendMessage(userPrompt, conversationHistoryRaw=[], options = {}) {
+        // Extract options with defaults
+        const { useRAG = false } = options;
+        
+        console.log(`[AskService] 🚀 Sending message with RAG ${useRAG ? 'ENABLED' : 'DISABLED'}`);
+        
         // Don't force ask window visibility - messages go to sidebar if header is active
         // Only show ask window if no target window is available
         const targetWindow = this._getTargetWindow();
@@ -410,24 +415,30 @@ class AskService {
                 console.log(`[AskService] Retrieved ${conversationHistoryRaw.length} messages from conversation history`);
             }
             
+            // RAG (Retrieval-Augmented Generation) - Only run if Research Library is enabled
             let retrievedChunks = [];
-            try {
-                console.log(`[AskService:RAG] Searching document chunks for query: "${userPrompt.substring(0, 80)}"`);
-                const retrievalResult = await this.retrievalService.search({
-                    query: userPrompt,
-                    limit: 5
-                });
-                if (retrievalResult.success) {
-                    retrievedChunks = retrievalResult.results;
-                    console.log(`[AskService:RAG] Retrieved ${retrievedChunks.length} chunks (provider=${retrievalResult.provider}, model=${retrievalResult.model})`);
-                    this.state.retrievalResults = retrievedChunks;
-                    this._broadcastState();
-                } else {
-                    console.warn(`[AskService:RAG] Retrieval skipped: ${retrievalResult.reason}`);
+            if (useRAG) {
+                try {
+                    console.log(`[AskService:RAG] ✅ Research Library ENABLED - Searching document chunks for query: "${userPrompt.substring(0, 80)}"`);
+                    const retrievalResult = await this.retrievalService.search({
+                        query: userPrompt,
+                        limit: 5
+                    });
+                    if (retrievalResult.success) {
+                        retrievedChunks = retrievalResult.results;
+                        console.log(`[AskService:RAG] Retrieved ${retrievedChunks.length} chunks (provider=${retrievalResult.provider}, model=${retrievalResult.model})`);
+                        this.state.retrievalResults = retrievedChunks;
+                        this._broadcastState();
+                    } else {
+                        console.warn(`[AskService:RAG] Retrieval skipped: ${retrievalResult.reason}`);
+                        this.state.retrievalResults = [];
+                    }
+                } catch (retrievalError) {
+                    console.error('[AskService:RAG] Retrieval failed:', retrievalError);
                     this.state.retrievalResults = [];
                 }
-            } catch (retrievalError) {
-                console.error('[AskService:RAG] Retrieval failed:', retrievalError);
+            } else {
+                console.log(`[AskService:RAG] ❌ Research Library DISABLED - Skipping document retrieval`);
                 this.state.retrievalResults = [];
             }
 
