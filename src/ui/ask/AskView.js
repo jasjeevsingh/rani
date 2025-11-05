@@ -3304,9 +3304,9 @@ export class AskView extends LitElement {
         });
     }
 
-    firstUpdated() {
-        setTimeout(() => this.adjustWindowHeight(), 200);
-    }
+    // firstUpdated() {
+    //     setTimeout(() => this.adjustWindowHeight(), 200);
+    // }
     
     /**
      * Toggle Research Library context for RAG system
@@ -3366,7 +3366,7 @@ export class AskView extends LitElement {
         if (!textarea) return;
         
         // Reset height to measure scrollHeight accurately
-        textarea.style.height = '40px';
+        textarea.style.height = 'auto';
         
         // Calculate new height within bounds
         const newHeight = Math.max(40, Math.min(200, textarea.scrollHeight));
