@@ -21,6 +21,9 @@
     <meta name="twitter:image" content="https://jasjeevsingh.github.io/rani/assets/og-image.png">
     
     <title>RANI - Your AI Research Colleague</title>
+    
+    <link rel="icon" type="image/png" href="assets/rani_logo.png">
+    <link rel="apple-touch-icon" href="assets/rani_logo.png">
 
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,16 +36,7 @@
         <div class="container">
             <div class="nav-content">
                 <div class="logo">
-                    <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="40" height="40" rx="8" fill="url(#gradient)"/>
-                        <path d="M12 14h16M12 20h12M12 26h16" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-                        <defs>
-                            <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
-                                <stop offset="0%" stop-color="#3B82F6"/>
-                                <stop offset="100%" stop-color="#8B5CF6"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
+                    <img src="assets/rani_logo.png" alt="RANI Logo" class="logo-img">
                     <span class="logo-text">RANI</span>
                 </div>
                 <div class="nav-links">
@@ -51,12 +45,24 @@
                     <a href="#privacy" class="nav-link">Privacy</a>
                     <a href="#use-cases" class="nav-link">Use Cases</a>
                     <a href="mailto:jasjeev@upenn.edu" class="nav-link">Contact</a>
+                    <button class="theme-toggle" id="themeToggle" onclick="toggleDarkMode()" aria-label="Toggle dark mode">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                        </svg>
+                    </button>
                 </div>
-                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
+                <div class="mobile-nav-controls">
+                    <button class="theme-toggle mobile-theme-toggle" id="mobileThemeToggle" onclick="toggleDarkMode()" aria-label="Toggle dark mode">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                        </svg>
+                    </button>
+                    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
@@ -70,13 +76,6 @@
         <a href="mailto:jasjeev@upenn.edu" class="mobile-menu-link">Contact</a>
     </div>
 
-    <!-- Dark Mode Toggle -->
-    <button class="theme-toggle" id="themeToggle" onclick="toggleDarkMode()" aria-label="Toggle dark mode">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-        </svg>
-    </button>
-
     <!-- Scroll to Top Button -->
     <button class="scroll-to-top" id="scrollToTop" aria-label="Scroll to top">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,19 +87,19 @@
     <section class="hero">
         <div class="container">
             <div class="hero-content">
-                <div class="badge">AI Research Assistant</div>
+                <!-- <div class="badge">AI Research Assistant</div> -->
                 <h1 class="hero-title">The First AI Research Colleague</h1>
                 <p class="hero-subtitle">
-                    RANI transforms your desktop into an intelligent research companion that 
-                    <span class="highlight">understands your screen</span>, 
-                    <span class="highlight">listens to your meetings</span>, and 
-                    <span class="highlight">helps you discover</span>, analyze, and annotate research papers.
+                    RANI transforms your computer into an intelligent companion that 
+                    <span class="highlight">sees your screen </span>, 
+                    <span class="highlight">understands your research library</span>, and 
+                    <span class="highlight">gives you scientifically accurate insights.</span>
                 </p>
                 <div class="hero-cta">
-                    <a href="#pricing" class="btn btn-primary btn-large">
-                        Try RANI Free
+                    <a href="https://tally.so/r/kdaW4r" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-large">
+                        Join the Waitlist
                         <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M5 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M5 10h10m0 0l-4-4m4 4l-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </a>
                     <a href="mailto:jasjeev@upenn.edu?subject=RANI%20Demo%20Request&body=Hi%2C%0A%0AI'm%20interested%20in%20learning%20more%20about%20RANI%20and%20would%20like%20to%20schedule%20a%20demo.%0A%0AName%3A%20%0AInstitution%2FOrganization%3A%20%0AResearch%20Area%3A%20%0APreferred%20Time%3A%20%0A%0AThank%20you!" class="btn btn-secondary btn-large">
@@ -186,7 +185,7 @@
         <div class="container">
             <div class="section-header">
                 <h2 class="section-title">Everything You Need for Research</h2>
-                <p class="section-subtitle">Built by researchers, for researchers. RANI combines powerful AI with privacy-first design.</p>
+                <p class="section-subtitle">Built for researchers, by researchers. RANI combines powerful AI with privacy-first design.</p>
             </div>
             <div class="features-grid">
                 <div class="feature-card">
@@ -512,32 +511,32 @@
                 <div class="comparison-row">
                     <div class="comparison-cell label">Context Awareness</div>
                     <div class="comparison-cell">❌ Manual copy-paste</div>
-                    <div class="comparison-cell highlight">✅ Automatic screen/audio</div>
+                    <div class="comparison-cell highlight">✔️ Automatic screen/audio</div>
                 </div>
                 <div class="comparison-row">
                     <div class="comparison-cell label">Paper Discovery</div>
                     <div class="comparison-cell">❌ Multiple separate apps</div>
-                    <div class="comparison-cell highlight">✅ Integrated search & import</div>
+                    <div class="comparison-cell highlight">✔️ Integrated search & import</div>
                 </div>
                 <div class="comparison-row">
                     <div class="comparison-cell label">AI Provider</div>
                     <div class="comparison-cell">❌ Locked to one service</div>
-                    <div class="comparison-cell highlight">✅ Multiple options + local</div>
+                    <div class="comparison-cell highlight">✔️ Multiple options + local</div>
                 </div>
                 <div class="comparison-row">
                     <div class="comparison-cell label">Data Privacy</div>
                     <div class="comparison-cell">❌ Cloud-only storage</div>
-                    <div class="comparison-cell highlight">✅ Local-first architecture</div>
+                    <div class="comparison-cell highlight">✔️ Local-first architecture</div>
                 </div>
                 <div class="comparison-row">
                     <div class="comparison-cell label">Cost</div>
                     <div class="comparison-cell">❌ Expensive subscriptions</div>
-                    <div class="comparison-cell highlight">✅ From free to $30/month</div>
+                    <div class="comparison-cell highlight">✔️ From free to $30/month</div>
                 </div>
                 <div class="comparison-row">
                     <div class="comparison-cell label">Customization</div>
                     <div class="comparison-cell">❌ One-size-fits-all</div>
-                    <div class="comparison-cell highlight">✅ Flexible AI model choice</div>
+                    <div class="comparison-cell highlight">✔️ Flexible AI model choice</div>
                 </div>
             </div>
         </div>
@@ -572,14 +571,14 @@
                         <div class="privacy-feature-title">Local-First Storage</div>
                         <div class="privacy-feature-desc">All documents stored on your device</div>
                     </div>
-                    <div class="privacy-feature">
+                    <!-- <div class="privacy-feature">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                         </svg>
                         <div class="privacy-feature-title">Encrypted Data</div>
                         <div class="privacy-feature-desc">End-to-end encryption for cloud features</div>
-                    </div>
+                    </div> -->
                     <div class="privacy-feature">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -690,12 +689,12 @@
         <div class="container">
             <div class="download-content">
                 <h2 class="download-title">Ready to Transform Your Research?</h2>
-                <p class="download-subtitle">Try RANI v1.0 free and experience smarter research today.</p>
+                <p class="download-subtitle">Join the waitlist for RANI and be among the first to experience smarter research.</p>
                 <div class="download-buttons">
-                    <a href="#pricing" class="btn btn-primary btn-large" id="primaryDownloadBtn">
-                        <span>Try RANI v1.0</span>
+                    <a href="https://tally.so/r/kdaW4r" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-large" id="primaryDownloadBtn">
+                        <span>Join the Waitlist</span>
                         <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M5 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M5 10h10m0 0l-4-4m4 4l-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </a>
                     <a href="mailto:jasjeev@upenn.edu?subject=RANI%20Demo%20Request&body=Hi%2C%0A%0AI'm%20interested%20in%20learning%20more%20about%20RANI%20and%20would%20like%20to%20schedule%20a%20demo.%0A%0AName%3A%20%0AInstitution%2FOrganization%3A%20%0AResearch%20Area%3A%20%0APreferred%20Time%3A%20%0A%0AThank%20you!" class="btn btn-secondary btn-large">
@@ -719,21 +718,12 @@
             <div class="footer-content">
                 <div class="footer-section">
                     <div class="footer-logo">
-                        <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="40" height="40" rx="8" fill="url(#gradient2)"/>
-                            <path d="M12 14h16M12 20h12M12 26h16" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-                            <defs>
-                                <linearGradient id="gradient2" x1="0" y1="0" x2="40" y2="40">
-                                    <stop offset="0%" stop-color="#3B82F6"/>
-                                    <stop offset="100%" stop-color="#8B5CF6"/>
-                                </linearGradient>
-                            </defs>
-                        </svg>
+                        <img src="assets/rani_logo.png" alt="RANI Logo" class="logo-img">
                         <span class="footer-logo-text">RANI</span>
                     </div>
                     <p class="footer-description">
-                        Your AI Research Copilot.<br>
-                        Open source, privacy-first, and built for researchers.
+                        The First AI Research Colleague.<br>
+                        Built for researchers, by researchers.
                     </p>
                 </div>
 
@@ -751,7 +741,7 @@
                     <h4 class="footer-heading">Resources</h4>
                     <ul class="footer-links">
                         <li><a href="mailto:jasjeev@upenn.edu?subject=RANI%20Demo%20Request">Request Demo</a></li>
-                        <li><a href="mailto:jasjeev@upenn.edu?subject=RANI%20Support">Support</a></li>
+                        <li><a href="#privacy">Privacy</a></li>
                         <li><a href="mailto:jasjeev@upenn.edu?subject=RANI%20Inquiry">Contact Sales</a></li>
                     </ul>
                 </div>

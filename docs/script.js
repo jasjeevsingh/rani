@@ -194,10 +194,13 @@ function initCarousel() {
     
     function showSlide(index) {
         // Wrap around
-        if (index >= images.length) currentSlide = 0;
-        if (index < 0) currentSlide = images.length - 1;
-        
-        currentSlide = index;
+        if (index >= images.length) {
+            currentSlide = 0;
+        } else if (index < 0) {
+            currentSlide = images.length - 1;
+        } else {
+            currentSlide = index;
+        }
         
         // Update images
         images.forEach((img, i) => {
