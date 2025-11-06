@@ -7,11 +7,13 @@ class RequestQueue {
         this.queue = [];
         this.processing = false;
         this.streamingActive = false;
+        this.concurrentEmbeddings = 0;
+        this.maxConcurrentEmbeddings = 4; // Allow 4 parallel embedding requests
     }
 
     async addStreamingRequest(requestFn) {
         // Streaming requests have priority - wait for current processing to finish
-        while (this.processing) {
+        while (this.processing || this.concurrentEmbeddings > 0) {
             await new Promise(resolve => setTimeout(resolve, 50));
         }
         
@@ -27,6 +29,21 @@ class RequestQueue {
         }
     }
 
+    async addEmbeddingRequest(requestFn) {
+        // Wait if streaming is active or we've hit the concurrent limit
+        while (this.streamingActive || this.concurrentEmbeddings >= this.maxConcurrentEmbeddings) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        this.concurrentEmbeddings++;
+        try {
+            const result = await requestFn();
+            return result;
+        } finally {
+            this.concurrentEmbeddings--;
+        }
+    }
+
     async add(requestFn) {
         return new Promise((resolve, reject) => {
             this.queue.push({ requestFn, resolve, reject });
@@ -39,8 +56,8 @@ class RequestQueue {
             return;
         }
 
-        // Wait if streaming is active
-        if (this.streamingActive) {
+        // Wait if streaming is active or embeddings are running
+        if (this.streamingActive || this.concurrentEmbeddings > 0) {
             setTimeout(() => this.process(), 100);
             return;
         }
@@ -49,7 +66,7 @@ class RequestQueue {
 
         while (this.queue.length > 0) {
             // Check if streaming started while processing queue
-            if (this.streamingActive) {
+            if (this.streamingActive || this.concurrentEmbeddings > 0) {
                 this.processing = false;
                 setTimeout(() => this.process(), 100);
                 return;
@@ -348,7 +365,7 @@ function createEmbeddingClient({
             throw new Error('Cannot generate embedding for empty text content.');
         }
 
-        return await requestQueue.add(async () => {
+        return await requestQueue.addEmbeddingRequest(async () => {
             console.log(`[Ollama] Sending embedding request to ${baseUrl}/api/embeddings`);
             
             const controller = new AbortController();
@@ -395,11 +412,9 @@ function createEmbeddingClient({
 
     return {
         embedTexts: async (texts = []) => {
-            const results = [];
-            for (const text of texts) {
-                results.push(await embedOnce(text));
-            }
-            return results;
+            // Process requests in parallel for better performance
+            const promises = texts.map(text => embedOnce(text));
+            return await Promise.all(promises);
         }
     };
 }

@@ -97,8 +97,19 @@ class ModelStateService extends EventEmitter {
     
     setupLocalAIStateSync() {
         const localAIManager = require('./localAIManager');
+        // Debounce state changes to prevent spam during operations (like embedding)
+        this._stateChangeDebounceTimers = {};
+        
         localAIManager.on('state-changed', (service, status) => {
-            this.handleLocalAIStateChange(service, status);
+            // Cancel existing timer for this service
+            if (this._stateChangeDebounceTimers[service]) {
+                clearTimeout(this._stateChangeDebounceTimers[service]);
+            }
+            
+            // Debounce for 5 seconds - only process if state stays changed
+            this._stateChangeDebounceTimers[service] = setTimeout(() => {
+                this.handleLocalAIStateChange(service, status);
+            }, 5000);
         });
     }
 

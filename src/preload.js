@@ -377,7 +377,11 @@ contextBridge.exposeInMainWorld('api', {
     
     // Open document in viewer
     openDocument: (documentId) => 
-      ipcRenderer.invoke('documents:openDocument', documentId)
+      ipcRenderer.invoke('documents:openDocument', documentId),
+    
+    // Get document embedding status
+    getDocumentEmbeddingStatus: (documentId) =>
+      ipcRenderer.invoke('documents:getEmbeddingStatus', documentId)
   },
 
   // Annotation management API
