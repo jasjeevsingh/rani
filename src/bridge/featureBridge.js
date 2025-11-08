@@ -13,6 +13,7 @@ const VOICE_CONFIG = require('../features/voice/voiceConfig');
 const listenService = require('../features/listen/listenService');
 const permissionService = require('../features/common/services/permissionService');
 const encryptionService = require('../features/common/services/encryptionService');
+const betaConfigService = require('../features/common/services/betaConfigService');
 
 module.exports = {
   // Renderer로부터의 요청을 수신하고 서비스로 전달
@@ -300,6 +301,15 @@ module.exports = {
         console.error('[FeatureBridge] OpenAI TTS error:', error);
         return { success: false, error: error.message, fallback: true };
       }
+    });
+
+    // Beta Configuration handlers
+    ipcMain.handle('common:hasBetaApiKey', async () => {
+      return betaConfigService.hasBetaApiKey();
+    });
+    
+    ipcMain.handle('common:configureBetaApiKey', async () => {
+      return await betaConfigService.configureBetaApiKey();
     });
 
     console.log('[FeatureBridge] Initialized with all feature handlers.');

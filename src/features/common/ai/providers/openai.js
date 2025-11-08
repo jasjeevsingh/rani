@@ -169,19 +169,44 @@ function createLLM({ apiKey, model = 'gpt-5-mini', temperature = 0.7, maxTokens 
   const client = new OpenAI({ apiKey });
   
   const callApi = async (messages) => {
+    // GPT-5 and o-series models use max_completion_tokens instead of max_tokens
+    // GPT-5 and o-series only support temperature=1 (default)
+    const isGPT5 = model.startsWith('gpt-5');
+    const isOSeries = model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4');
+    const useCompletionTokens = isGPT5 || isOSeries;
+    const skipTemperature = isGPT5 || isOSeries;
+    const tokenParam = useCompletionTokens ? 'max_completion_tokens' : 'max_tokens';
+    
     if (!usePortkey) {
-      const response = await client.chat.completions.create({
+      const completionParams = {
         model: model,
         messages: messages,
-        temperature: temperature,
-        max_tokens: maxTokens
-      });
+        [tokenParam]: maxTokens
+      };
+      
+      // Only add temperature for models that support it
+      if (!skipTemperature) {
+        completionParams.temperature = temperature;
+      }
+      
+      const response = await client.chat.completions.create(completionParams);
       return {
         content: response.choices[0].message.content.trim(),
         raw: response
       };
     } else {
       const fetchUrl = 'https://api.portkey.ai/v1/chat/completions';
+      const requestBody = {
+        model: model,
+        messages,
+        [tokenParam]: maxTokens,
+      };
+      
+      // Only add temperature for models that support it
+      if (!skipTemperature) {
+        requestBody.temperature = temperature;
+      }
+      
       const response = await fetch(fetchUrl, {
         method: 'POST',
         headers: {
@@ -189,12 +214,7 @@ function createLLM({ apiKey, model = 'gpt-5-mini', temperature = 0.7, maxTokens 
             'x-portkey-virtual-key': portkeyVirtualKey || apiKey,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            model: model,
-            messages,
-            temperature,
-            max_tokens: maxTokens,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -279,20 +299,42 @@ function createStreamingLLM({ apiKey, model = 'gpt-5-mini', temperature = 0.7, m
             'Content-Type': 'application/json',
           };
 
+      // GPT-5 and o-series models use max_completion_tokens instead of max_tokens
+      // GPT-5 and o-series only support temperature=1 (default)
+      const isGPT5 = model.startsWith('gpt-5');
+      const isOSeries = model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4');
+      const useCompletionTokens = isGPT5 || isOSeries;
+      const skipTemperature = isGPT5 || isOSeries;
+      
+      const requestBody = {
+          model: model,
+          messages,
+          ...(skipTemperature ? {} : { temperature }),
+          ...(useCompletionTokens ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+          stream: true,
+        };
+
+      console.log('[OpenAI] Request:', {
+        url: fetchUrl,
+        model,
+        messageCount: messages.length,
+        hasApiKey: !!headers.Authorization
+      });
+
       const response = await fetch(fetchUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          model: model,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-          stream: true,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text();
+        console.error('[OpenAI] API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody
+        });
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorBody}`);
       }
 
       return response;

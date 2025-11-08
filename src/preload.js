@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('api', {
     startFirebaseAuth: () => ipcRenderer.invoke('start-firebase-auth'),
     firebaseLogout: () => ipcRenderer.invoke('firebase-logout'),
     
+    // Beta Configuration
+    hasBetaApiKey: () => ipcRenderer.invoke('common:hasBetaApiKey'),
+    configureBetaApiKey: () => ipcRenderer.invoke('common:configureBetaApiKey'),
+    
     // App Control
       quitApplication: () => ipcRenderer.invoke('quit-application'),
       openExternal: (url) => ipcRenderer.invoke('open-external', url),

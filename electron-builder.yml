@@ -27,6 +27,7 @@ files:
 extraResources:
     - from: pickleglass_web/out
       to: out
+    - .env.beta
 
 asarUnpack:
     - "src/ui/assets/SystemAudioDump"

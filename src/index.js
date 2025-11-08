@@ -158,10 +158,13 @@ if (process.platform === 'win32') {
 }
 
 const gotTheLock = app.requestSingleInstanceLock();
+console.log('[App] Got single instance lock:', gotTheLock);
 if (!gotTheLock) {
+    console.log('[App] Another instance is running, exiting...');
     app.quit();
     process.exit(0);
 }
+console.log('[App] Continuing as single instance');
 
 // setup protocol after single instance lock
 setupProtocolHandling();
