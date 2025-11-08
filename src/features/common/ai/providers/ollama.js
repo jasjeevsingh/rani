@@ -8,7 +8,7 @@ class RequestQueue {
         this.processing = false;
         this.streamingActive = false;
         this.concurrentEmbeddings = 0;
-        this.maxConcurrentEmbeddings = 4; // Allow 4 parallel embedding requests
+        this.maxConcurrentEmbeddings = 1; // Allow 1 parallel embedding requests
     }
 
     async addStreamingRequest(requestFn) {
@@ -366,6 +366,7 @@ function createEmbeddingClient({
         }
 
         return await requestQueue.addEmbeddingRequest(async () => {
+            const requestStartTime = Date.now();
             console.log(`[Ollama] Sending embedding request to ${baseUrl}/api/embeddings`);
             
             const controller = new AbortController();
@@ -398,7 +399,8 @@ function createEmbeddingClient({
                     throw new Error('Ollama embeddings response did not include an embedding vector.');
                 }
 
-                console.log(`[Ollama] Received embedding vector of dimension ${data.embedding.length}`);
+                const requestDuration = ((Date.now() - requestStartTime) / 1000).toFixed(2);
+                console.log(`[Ollama] Received embedding vector of dimension ${data.embedding.length} in ${requestDuration}s`);
                 return data.embedding;
             } catch (error) {
                 clearTimeout(timeout);

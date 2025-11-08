@@ -283,6 +283,10 @@ export class RaniApp extends LitElement {
                 const documents = await window.api.documents.getUserDocuments();
                 const papers = window.api.research ? await window.api.research.getUserPapers() : [];
                 
+                console.log('[PickleGlassApp] handleLoadDocuments - documents:', documents.length, 'papers:', papers.length);
+                console.log('[PickleGlassApp] Document IDs:', documents.map(d => d.id));
+                console.log('[PickleGlassApp] Paper IDs:', papers.map(p => p.id));
+                
                 const researchView = this.shadowRoot.querySelector('research-view');
                 if (researchView) {
                     researchView.updateDocuments(documents);

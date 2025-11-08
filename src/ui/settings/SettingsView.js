@@ -635,10 +635,13 @@ export class SettingsView extends LitElement {
         apiKeys: { type: Object, state: true },
         availableLlmModels: { type: Array, state: true },
         availableSttModels: { type: Array, state: true },
+        availableEmbeddingModels: { type: Array, state: true },
         selectedLlm: { type: String, state: true },
         selectedStt: { type: String, state: true },
+        selectedEmbedding: { type: String, state: true },
         isLlmListVisible: { type: Boolean },
         isSttListVisible: { type: Boolean },
+        isEmbeddingListVisible: { type: Boolean },
         presets: { type: Array, state: true },
         selectedPreset: { type: Object, state: true },
         showPresets: { type: Boolean, state: true },
@@ -665,10 +668,13 @@ export class SettingsView extends LitElement {
         this.saving = false;
         this.availableLlmModels = [];
         this.availableSttModels = [];
+        this.availableEmbeddingModels = [];
         this.selectedLlm = null;
         this.selectedStt = null;
+        this.selectedEmbedding = null;
         this.isLlmListVisible = false;
         this.isSttListVisible = false;
+        this.isEmbeddingListVisible = false;
         this.presets = [];
         this.selectedPreset = null;
         this.showPresets = false;
@@ -771,13 +777,15 @@ export class SettingsView extends LitElement {
             if (userState && userState.isLoggedIn) this.firebaseUser = userState;
             
             if (modelSettings.success) {
-                const { config, storedKeys, availableLlm, availableStt, selectedModels } = modelSettings.data;
+                const { config, storedKeys, availableLlm, availableStt, availableEmbedding, selectedModels } = modelSettings.data;
                 this.providerConfig = config;
                 this.apiKeys = storedKeys;
                 this.availableLlmModels = availableLlm;
                 this.availableSttModels = availableStt;
+                this.availableEmbeddingModels = availableEmbedding || [];
                 this.selectedLlm = selectedModels.llm;
                 this.selectedStt = selectedModels.stt;
+                this.selectedEmbedding = selectedModels.embedding;
             }
 
             this.presets = presets || [];
@@ -900,13 +908,17 @@ export class SettingsView extends LitElement {
     }
 
     async refreshModelData() {
-        const [availableLlm, availableStt, selected, storedKeys] = await Promise.all([
+        const [availableLlm, availableStt, availableEmbedding, selected, storedKeys] = await Promise.all([
             window.api.settingsView.getAvailableModels({ type: 'llm' }),
             window.api.settingsView.getAvailableModels({ type: 'stt' }),
+            window.api.settingsView.getAvailableModels({ type: 'embedding' }),
             window.api.settingsView.getSelectedModels(),
             window.api.settingsView.getAllKeys()
         ]);
         console.log('[SettingsView] Available LLM models:', availableLlm);
+        console.log('[SettingsView] Available STT models:', availableStt);
+        console.log('[SettingsView] Available Embedding models:', availableEmbedding);
+        console.log('[SettingsView] Selected models:', selected);
         const llmModelsById = new Map(availableLlm.map(model => [model.id, model]));
         this.availableLlmModels = LLM_MODEL_WHITELIST
             .map(meta => {
@@ -914,14 +926,18 @@ export class SettingsView extends LitElement {
                 return { ...resolved, ...meta };
             });
         this.availableSttModels = availableStt;
+        this.availableEmbeddingModels = availableEmbedding;
         this.selectedLlm = selected.llm;
         this.selectedStt = selected.stt;
+        this.selectedEmbedding = selected.embedding;
         this.apiKeys = storedKeys;
         this.requestUpdate();
     }
     
     async toggleModelList(type) {
-        const visibilityProp = type === 'llm' ? 'isLlmListVisible' : 'isSttListVisible';
+        const visibilityProp = type === 'llm' ? 'isLlmListVisible' : 
+                               type === 'stt' ? 'isSttListVisible' : 
+                               'isEmbeddingListVisible';
 
         if (!this[visibilityProp]) {
             this.saving = true;
@@ -942,7 +958,8 @@ export class SettingsView extends LitElement {
         const provider = this.getProviderForModel(type, modelId);
         if (provider === 'ollama') {
             // Find the model in the available models list
-            const model = this.availableLlmModels.find(m => m.id === modelId);
+            const modelList = type === 'llm' ? this.availableLlmModels : this.availableEmbeddingModels;
+            const model = modelList.find(m => m.id === modelId);
             if (model && !model.installed && !this.installingModels[modelId]) {
                 // Need to install the model first
                 await this.installOllamaModel(modelId);
@@ -965,8 +982,14 @@ export class SettingsView extends LitElement {
         await window.api.settingsView.setSelectedModel({ type, modelId });
         if (type === 'llm') this.selectedLlm = modelId;
         if (type === 'stt') this.selectedStt = modelId;
+        if (type === 'embedding') this.selectedEmbedding = modelId;
+        
+        // Refresh model data to ensure the list stays up to date
+        await this.refreshModelData();
+        
         this.isLlmListVisible = false;
         this.isSttListVisible = false;
+        this.isEmbeddingListVisible = false;
         this.saving = false;
         this.requestUpdate();
     }
@@ -1100,7 +1123,9 @@ export class SettingsView extends LitElement {
         
         // Check providerConfig for other models
         for (const [providerId, config] of Object.entries(this.providerConfig)) {
-            const models = type === 'llm' ? config.llmModels : config.sttModels;
+            const models = type === 'llm' ? config.llmModels : 
+                          type === 'stt' ? config.sttModels : 
+                          config.embeddingModels;
             if (models?.some(m => m.id === modelId)) {
                 return providerId;
             }
@@ -1407,16 +1432,6 @@ export class SettingsView extends LitElement {
             await this.refreshOllamaStatus();
         }
     }
-    
-    showSuccessModal(title, message) {
-        this.modalMessage = { show: true, title, message };
-        this.requestUpdate();
-    }
-    
-    closeModal() {
-        this.modalMessage = { show: false, title: '', message: '' };
-        this.requestUpdate();
-    }
 
     //////// after_modelStateService ////////
     render() {
@@ -1509,7 +1524,9 @@ export class SettingsView extends LitElement {
         `;
         
         const getModelName = (type, id) => {
-            const models = type === 'llm' ? this.availableLlmModels : this.availableSttModels;
+            const models = type === 'llm' ? this.availableLlmModels : 
+                          type === 'stt' ? this.availableSttModels : 
+                          this.availableEmbeddingModels;
             const model = models.find(m => m.id === id);
             return model ? model.name : id;
         }
@@ -1612,6 +1629,39 @@ export class SettingsView extends LitElement {
                                                     <div class="install-progress-bar" style="width: ${installProgress}%"></div>
                                                 </div>
                                             ` : whisperModel?.installed ? html`
+                                                <span class="model-status installed">✓ Installed</span>
+                                            ` : html`
+                                                <span class="model-status not-installed">Not Installed</span>
+                                            `}
+                                        ` : ''}
+                                    </div>
+                                `;
+                            })}
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="model-select-group">
+                    <label>Embedding Model: <strong>${getModelName('embedding', this.selectedEmbedding) || 'Not Set'}</strong></label>
+                    <button class="settings-button full-width" @click=${() => this.toggleModelList('embedding')} ?disabled=${this.saving || this.availableEmbeddingModels.length === 0}>
+                        Change Embedding Model
+                    </button>
+                    ${this.isEmbeddingListVisible ? html`
+                        <div class="model-list">
+                            ${this.availableEmbeddingModels.map(model => {
+                                const isOllama = this.getProviderForModel('embedding', model.id) === 'ollama';
+                                const isInstalling = this.installingModels[model.id] !== undefined;
+                                const installProgress = this.installingModels[model.id] || 0;
+                                
+                                return html`
+                                    <div class="model-item ${this.selectedEmbedding === model.id ? 'selected' : ''}" 
+                                         @click=${() => this.selectModel('embedding', model.id)}>
+                                        <span>${model.name}</span>
+                                        ${isOllama ? html`
+                                            ${isInstalling ? html`
+                                                <div class="install-progress">
+                                                    <div class="install-progress-bar" style="width: ${installProgress}%"></div>
+                                                </div>
+                                            ` : model.installed ? html`
                                                 <span class="model-status installed">✓ Installed</span>
                                             ` : html`
                                                 <span class="model-status not-installed">Not Installed</span>

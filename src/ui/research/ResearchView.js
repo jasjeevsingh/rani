@@ -845,6 +845,10 @@ export class ResearchView extends LitElement {
     renderLibrary() {
         const totalItems = this.documents.length + this.papers.length;
         
+        // Filter out documents that are associated with papers to avoid duplicates
+        const paperDocumentIds = new Set(this.papers.map(p => p.document_id).filter(Boolean));
+        const standaloneDocuments = this.documents.filter(doc => !paperDocumentIds.has(doc.id) && !doc.metadata?.paperId);
+        
         return html`
             <div class="upload-zone" @drop=${this.handleDrop} @dragover=${this.handleDragOver} @dragleave=${this.handleDragLeave}>
                 <p>Drop PDF files here to upload them to your research library</p>
@@ -861,7 +865,7 @@ export class ResearchView extends LitElement {
             ` : html`
                 <div class="document-list">
                     ${this.papers.map(paper => this.renderPaperLibraryCard(paper))}
-                    ${this.documents.map(doc => this.renderDocumentCard(doc))}
+                    ${standaloneDocuments.map(doc => this.renderDocumentCard(doc))}
                 </div>
             `}
         `;
@@ -988,7 +992,13 @@ export class ResearchView extends LitElement {
     }
 
     renderDocumentList() {
-        const totalItems = this.documents.length + this.papers.length;
+        // Filter out documents that are associated with papers to avoid duplicates
+        const paperDocumentIds = new Set(this.papers.map(p => p.document_id).filter(Boolean));
+        const standaloneDocuments = this.documents.filter(doc => 
+            !paperDocumentIds.has(doc.id) && !doc.metadata?.paperId
+        );
+        
+        const totalItems = standaloneDocuments.length + this.papers.length;
         
         if (totalItems === 0) {
             return html`
@@ -1001,7 +1011,7 @@ export class ResearchView extends LitElement {
         return html`
             <div class="document-list">
                 ${this.papers.slice(0, 10).map(paper => this.renderSidebarPaperCard(paper))}
-                ${this.documents.slice(0, 10).map(doc => html`
+                ${standaloneDocuments.slice(0, 10).map(doc => html`
                     <div class="document-item" @click=${() => this.selectDocument(doc)}>
                         <h4 class="document-name">${doc.filename}</h4>
                         <p class="document-info">${this.formatDate(doc.uploaded_at)}</p>
@@ -1254,47 +1264,6 @@ export class ResearchView extends LitElement {
         }
     }
 
-    handleDeleteDocument(document) {
-        // Dispatch event that parent will handle
-        this.dispatchEvent(new CustomEvent('delete-document', {
-            detail: { document },
-            bubbles: true,
-            composed: true
-        }));
-    }
-
-    async loadSingleDocumentStatus(documentId) {
-        if (!window.api?.documents) return;
-        
-        try {
-            const status = await window.api.documents.getDocumentEmbeddingStatus(documentId);
-            this.documentEmbeddingStatuses[documentId] = status;
-            this.requestUpdate();
-        } catch (error) {
-            console.error('Failed to load document embedding status:', error);
-            this.documentEmbeddingStatuses[documentId] = { status: 'error' };
-            this.requestUpdate();
-        }
-    }
-
-    async embedDocument(document) {
-        if (!window.api?.documents) return;
-        
-        try {
-            this.documentEmbeddingStatuses[document.id] = { status: 'processing', progress: 0 };
-            this.requestUpdate();
-            
-            await window.api.documents.generateEmbeddingsForDocument(document.id);
-            
-            // Reload status
-            await this.loadSingleDocumentStatus(document.id);
-        } catch (error) {
-            console.error('Failed to embed document:', error);
-            this.documentEmbeddingStatuses[document.id] = { status: 'failed' };
-            this.requestUpdate();
-        }
-    }
-
     async embedPaper(paper) {
         try {
             this.embeddingStatuses[paper.id] = { status: 'processing' };
@@ -1393,6 +1362,10 @@ export class ResearchView extends LitElement {
     }
 
     updatePapers(papers) {
+        console.log('[ResearchView] updatePapers called with', papers.length, 'papers');
+        console.log('[ResearchView] Current papers count:', this.papers.length);
+        console.log('[ResearchView] Paper IDs received:', papers.map(p => p.id));
+        console.log('[ResearchView] Current paper IDs:', this.papers.map(p => p.id));
         this.papers = papers;
         this.requestUpdate();
         // Load embedding statuses for all papers

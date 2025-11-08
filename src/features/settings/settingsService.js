@@ -26,15 +26,16 @@ const NOTIFICATION_CONFIG = {
 // New facade functions for model state management
 async function getModelSettings() {
     try {
-        const [config, storedKeys, selectedModels, availableLlm, availableStt] = await Promise.all([
+        const [config, storedKeys, selectedModels, availableLlm, availableStt, availableEmbedding] = await Promise.all([
             modelStateService.getProviderConfig(),
             modelStateService.getAllApiKeys(),
             modelStateService.getSelectedModels(),
             modelStateService.getAvailableModels('llm'),
-            modelStateService.getAvailableModels('stt')
+            modelStateService.getAvailableModels('stt'),
+            modelStateService.getAvailableModels('embedding')
         ]);
         
-        return { success: true, data: { config, storedKeys, availableLlm, availableStt, selectedModels } };
+        return { success: true, data: { config, storedKeys, availableLlm, availableStt, availableEmbedding, selectedModels } };
     } catch (error) {
         console.error('[SettingsService] Error getting model settings:', error);
         return { success: false, error: error.message };

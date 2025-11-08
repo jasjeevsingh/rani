@@ -949,13 +949,16 @@ class OllamaService extends EventEmitter {
             if (this._lastState?.isRunning !== isRunning || 
                 this._lastState?.isInstalled !== isInstalled ||
                 loadedChanged) {
-                // Emit state change event - LocalAIManager가 처리
-                this.emit('state-changed', {
-                    installed: isInstalled,
-                    running: isRunning,
-                    models: models.length,
-                    loadedModels: loadedModels
-                });
+                // Skip emitting state changes if paused (e.g., during embedding operations)
+                if (!this._stateSyncPaused) {
+                    // Emit state change event - LocalAIManager가 처리
+                    this.emit('state-changed', {
+                        installed: isInstalled,
+                        running: isRunning,
+                        models: models.length,
+                        loadedModels: loadedModels
+                    });
+                }
             }
             
             this._lastState = { isInstalled, isRunning, modelsCount: models.length };
@@ -976,6 +979,10 @@ class OllamaService extends EventEmitter {
         if (this._syncInterval) return;
         
         this._syncInterval = setInterval(() => {
+            // Skip sync if paused (e.g., during embedding operations)
+            if (this._stateSyncPaused) {
+                return;
+            }
             this.syncState();
         }, 30000); // 30초마다
     }
@@ -985,6 +992,14 @@ class OllamaService extends EventEmitter {
             clearInterval(this._syncInterval);
             this._syncInterval = null;
         }
+    }
+    
+    pauseStateSync() {
+        this._stateSyncPaused = true;
+    }
+    
+    resumeStateSync() {
+        this._stateSyncPaused = false;
     }
 
     async warmUpModel(modelName, forceRefresh = false) {

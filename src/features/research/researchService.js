@@ -420,6 +420,16 @@ class ResearchService {
             `;
             
             const papers = this.db.getDb().prepare(query).all(userId, limit);
+            console.log(`[ResearchService] getUserPapers - Found ${papers.length} papers for user ${userId}`);
+            console.log(`[ResearchService] Paper IDs:`, papers.map(p => p.id));
+            
+            // Check for duplicates
+            const ids = papers.map(p => p.id);
+            const uniqueIds = [...new Set(ids)];
+            if (ids.length !== uniqueIds.length) {
+                console.error(`[ResearchService] WARNING: Found duplicate papers in DB! Total: ${ids.length}, Unique: ${uniqueIds.length}`);
+            }
+            
             return papers.map(paper => ({
                 ...paper,
                 metadata: paper.metadata ? JSON.parse(paper.metadata) : {}
@@ -444,9 +454,17 @@ class ResearchService {
                 throw new Error('Paper not found');
             }
             
+            console.log(`[ResearchService] generatePaperEmbeddings - paper:`, {
+                id: paper.id,
+                title: paper.title,
+                document_id: paper.document_id,
+                file_path: paper.file_path
+            });
+            
             // Check if paper has a PDF file but no document_id (needs import)
             if (paper.file_path && !paper.document_id) {
-                console.log(`[ResearchService] Paper has PDF but no document, importing: ${paper.file_path}`);
+                console.log(`[ResearchService] Paper has PDF but no document_id, importing: ${paper.file_path}`);
+                console.warn(`[ResearchService] ⚠️ WARNING: This paper should already have a document_id!`);
                 
                 const fs = require('fs');
                 if (!fs.existsSync(paper.file_path)) {

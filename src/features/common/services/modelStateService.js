@@ -111,6 +111,17 @@ class ModelStateService extends EventEmitter {
                 this.handleLocalAIStateChange(service, status);
             }, 5000);
         });
+        
+        // Handle pause/resume to cancel pending timers
+        localAIManager.on('pause-state-monitoring', () => {
+            console.log('[ModelStateService] 🛑 Canceling all pending state change timers');
+            Object.values(this._stateChangeDebounceTimers).forEach(timer => clearTimeout(timer));
+            this._stateChangeDebounceTimers = {};
+        });
+        
+        localAIManager.on('resume-state-monitoring', () => {
+            console.log('[ModelStateService] ✅ State monitoring resumed');
+        });
     }
 
     async handleLocalAIStateChange(service, state) {
@@ -286,7 +297,7 @@ class ModelStateService extends EventEmitter {
     getProviderForModel(arg1, arg2) {
         // Compatibility: support both (type, modelId) old order and (modelId, type) new order
         let type, modelId;
-        if (arg1 === 'llm' || arg1 === 'stt') {
+        if (arg1 === 'llm' || arg1 === 'stt' || arg1 === 'embedding') {
             type = arg1;
             modelId = arg2;
         } else {
@@ -297,15 +308,17 @@ class ModelStateService extends EventEmitter {
         
         // Check static provider models first
         for (const providerId in PROVIDERS) {
-            const models = type === 'llm' ? PROVIDERS[providerId].llmModels : PROVIDERS[providerId].sttModels;
+            const models = type === 'llm' ? PROVIDERS[providerId].llmModels : 
+                          type === 'stt' ? PROVIDERS[providerId].sttModels : 
+                          PROVIDERS[providerId].embeddingModels;
             if (models && models.some(m => m.id === modelId)) {
                 return providerId;
             }
         }
         
         // Check Ollama models (both installed and available)
-        if (type === 'llm') {
-            // Check if it's an Ollama model format (e.g., "llama3.2:latest", "gemma2:2b")
+        if (type === 'llm' || type === 'embedding') {
+            // Check if it's an Ollama model format (e.g., "llama3.2:latest", "gemma2:2b", "nomic-embed-text")
             // Ollama models typically have a colon in the name
             if (modelId.includes(':') || modelId.includes('/')) {
                 console.log(`[ModelStateService] Detected Ollama model format: ${modelId}`);
@@ -327,6 +340,7 @@ class ModelStateService extends EventEmitter {
         return {
             llm: active.llm?.selected_llm_model || null,
             stt: active.stt?.selected_stt_model || null,
+            embedding: active.embedding?.selected_embedding_model || null,
         };
     }
     
@@ -347,9 +361,12 @@ class ModelStateService extends EventEmitter {
         if (type === 'llm') {
             newSettings.selected_llm_model = modelId;
             console.log(`[ModelStateService] Setting selected_llm_model to: ${modelId}`);
-        } else {
+        } else if (type === 'stt') {
             newSettings.selected_stt_model = modelId;
             console.log(`[ModelStateService] Setting selected_stt_model to: ${modelId}`);
+        } else if (type === 'embedding') {
+            newSettings.selected_embedding_model = modelId;
+            console.log(`[ModelStateService] Setting selected_embedding_model to: ${modelId}`);
         }
         
         await providerSettingsRepository.upsert(provider, newSettings);
@@ -369,7 +386,11 @@ class ModelStateService extends EventEmitter {
     async getAvailableModels(type) {
         const allSettings = await providerSettingsRepository.getAll();
         const available = [];
-        const modelListKey = type === 'llm' ? 'llmModels' : 'sttModels';
+        const modelListKey = type === 'llm' ? 'llmModels' : type === 'stt' ? 'sttModels' : 'embeddingModels';
+
+        console.log(`[ModelStateService] getAvailableModels called with type: ${type}`);
+        console.log(`[ModelStateService] modelListKey: ${modelListKey}`);
+        console.log(`[ModelStateService] All settings:`, allSettings.map(s => ({ provider: s.provider, hasApiKey: !!s.api_key })));
 
         for (const setting of allSettings) {
             if (!setting.api_key) continue;
@@ -394,9 +415,13 @@ class ModelStateService extends EventEmitter {
                     available.push(...installed.map(m => ({ id: m.name, name: m.name, installed: true })));
                 }
             } else if (PROVIDERS[providerId]?.[modelListKey]) {
+                console.log(`[ModelStateService] Adding ${modelListKey} from provider ${providerId}:`, PROVIDERS[providerId][modelListKey]);
                 available.push(...PROVIDERS[providerId][modelListKey]);
+            } else {
+                console.log(`[ModelStateService] Provider ${providerId} has no ${modelListKey}`);
             }
         }
+        console.log(`[ModelStateService] Total available ${type} models:`, available.length);
         return [...new Map(available.map(item => [item.id, item])).values()];
     }
 

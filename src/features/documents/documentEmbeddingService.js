@@ -1,8 +1,10 @@
 const fetch = require('node-fetch');
 const { createEmbeddingClient } = require('../common/ai/factory');
+const providerSettingsRepository = require('../common/repositories/providerSettings');
 
 const DEFAULT_OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '');
-const DEFAULT_EMBEDDING_MODEL = process.env.RANI_EMBEDDING_MODEL || 'nomic-embed-text';
+const DEFAULT_OLLAMA_MODEL = 'nomic-embed-text';
+const DEFAULT_OPENAI_MODEL = 'text-embedding-3-small';
 
 /**
  * Service responsible for generating and storing embeddings for document chunks
@@ -22,6 +24,29 @@ class DocumentEmbeddingService {
     }
 
     async getEmbeddingContext() {
+        // Try OpenAI first (fastest and most reliable)
+        try {
+            const openaiSettings = await providerSettingsRepository.getByProvider('openai');
+            if (openaiSettings?.api_key) {
+                console.log('[DocumentEmbeddingService] OpenAI API key found, using OpenAI embeddings');
+                const client = createEmbeddingClient('openai', {
+                    apiKey: openaiSettings.api_key,
+                    model: DEFAULT_OPENAI_MODEL,
+                });
+                return { 
+                    success: true, 
+                    client, 
+                    provider: 'openai', 
+                    model: DEFAULT_OPENAI_MODEL 
+                };
+            } else {
+                console.log('[DocumentEmbeddingService] No OpenAI API key configured, falling back to Ollama');
+            }
+        } catch (error) {
+            console.warn('[DocumentEmbeddingService] Error checking OpenAI settings:', error);
+        }
+
+        // Fall back to Ollama (local)
         try {
             const baseUrl = DEFAULT_OLLAMA_BASE_URL;
             const healthResponse = await fetch(`${baseUrl}/api/tags`);
@@ -35,23 +60,23 @@ class DocumentEmbeddingService {
             // Check for model with or without :latest tag
             const hasModel = models.some(entry => {
                 const modelName = entry?.name || '';
-                return modelName === DEFAULT_EMBEDDING_MODEL || 
-                       modelName === `${DEFAULT_EMBEDDING_MODEL}:latest` ||
-                       modelName.startsWith(`${DEFAULT_EMBEDDING_MODEL}:`);
+                return modelName === DEFAULT_OLLAMA_MODEL || 
+                       modelName === `${DEFAULT_OLLAMA_MODEL}:latest` ||
+                       modelName.startsWith(`${DEFAULT_OLLAMA_MODEL}:`);
             });
             if (!hasModel) {
-                console.warn(`[DocumentEmbeddingService] Embedding model "${DEFAULT_EMBEDDING_MODEL}" is not installed in Ollama.`);
+                console.warn(`[DocumentEmbeddingService] Embedding model "${DEFAULT_OLLAMA_MODEL}" is not installed in Ollama.`);
                 console.warn(`[DocumentEmbeddingService] Available models:`, models.map(m => m?.name));
-                return { success: false, reason: 'model-not-installed', baseUrl, model: DEFAULT_EMBEDDING_MODEL };
+                return { success: false, reason: 'model-not-installed', baseUrl, model: DEFAULT_OLLAMA_MODEL };
             }
 
             const client = createEmbeddingClient('ollama', {
                 baseUrl,
-                model: DEFAULT_EMBEDDING_MODEL,
+                model: DEFAULT_OLLAMA_MODEL,
             });
-            return { success: true, client, provider: 'ollama', model: DEFAULT_EMBEDDING_MODEL };
+            return { success: true, client, provider: 'ollama', model: DEFAULT_OLLAMA_MODEL };
         } catch (error) {
-            console.error('[DocumentEmbeddingService] Failed to initialize Ollama embedding client:', error);
+            console.error('[DocumentEmbeddingService] Failed to initialize embedding client:', error);
             return { success: false, reason: 'client-init-failed', error };
         }
     }
@@ -147,6 +172,13 @@ class DocumentEmbeddingService {
         let processed = 0;
         const totalBatches = Math.ceil(chunks.length / batchSize);
         
+        // Pause state monitoring during embeddings to prevent false "not running" detections
+        const localAIManager = require('../common/services/localAIManager');
+        localAIManager.pauseStateMonitoring();
+        console.log('[DocumentEmbeddingService] ⏸️  Paused state monitoring during embedding operation');
+        
+        const overallStartTime = Date.now();
+        
         try {
             for (let index = 0; index < chunks.length; index += batchSize) {
                 const currentBatch = Math.floor(index / batchSize) + 1;
@@ -155,7 +187,10 @@ class DocumentEmbeddingService {
                 
                 console.log(`[DocumentEmbeddingService] Processing batch ${currentBatch}/${totalBatches} (${batch.length} chunks)...`);
                 
+                const embeddingStartTime = Date.now();
                 const embeddings = await client.embedTexts(texts);
+                const embeddingDuration = ((Date.now() - embeddingStartTime) / 1000).toFixed(2);
+                console.log(`[DocumentEmbeddingService] ⏱️  Embedding generation took ${embeddingDuration}s for ${batch.length} chunks`);
                 
                 console.log(`[DocumentEmbeddingService] Received ${embeddings?.length || 0} embeddings from Ollama`);
                 console.log(`[DocumentEmbeddingService] First embedding sample: dimension=${embeddings?.[0]?.length}, type=${typeof embeddings?.[0]}`);
@@ -166,7 +201,10 @@ class DocumentEmbeddingService {
                 }
 
                 console.log(`[DocumentEmbeddingService] About to call updateChunksWithEmbeddings with ${batch.length} chunks`);
+                const dbStartTime = Date.now();
                 this.updateChunksWithEmbeddings(batch, embeddings, provider, embeddingModel);
+                const dbDuration = ((Date.now() - dbStartTime) / 1000).toFixed(2);
+                console.log(`[DocumentEmbeddingService] ⏱️  Database update took ${dbDuration}s for ${batch.length} chunks`);
                 console.log(`[DocumentEmbeddingService] updateChunksWithEmbeddings returned successfully`);
                 processed += batch.length;
                 
@@ -174,8 +212,16 @@ class DocumentEmbeddingService {
             }
         } catch (error) {
             console.error('[DocumentEmbeddingService] Embedding process failed:', error);
+            localAIManager.resumeStateMonitoring();
+            console.log('[DocumentEmbeddingService] ▶️  Resumed state monitoring after error');
             return { success: false, processed, skipped: false, reason: 'embedding-error' };
         }
+        
+        // Resume state monitoring after embeddings complete
+        localAIManager.resumeStateMonitoring();
+        const overallDuration = ((Date.now() - overallStartTime) / 1000).toFixed(2);
+        console.log(`[DocumentEmbeddingService] ▶️  Resumed state monitoring after successful embedding`);
+        console.log(`[DocumentEmbeddingService] ⏱️  TOTAL TIME: ${overallDuration}s for ${processed} chunks`);
 
         console.log(`[DocumentEmbeddingService] Embedding complete! Processed ${processed} chunks using ${provider}/${embeddingModel}`);
         

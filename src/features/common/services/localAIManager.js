@@ -28,6 +28,9 @@ class LocalAIManager extends EventEmitter {
             }
         };
         
+        // State monitoring control
+        this._stateMonitoringPaused = false;
+        
         // setup event listeners
         this.setupEventListeners();
     }
@@ -55,6 +58,10 @@ class LocalAIManager extends EventEmitter {
         });
         
         ollamaService.on('state-changed', (state) => {
+            // Ignore state changes if monitoring is paused (e.g., during embedding operations)
+            if (this._stateMonitoringPaused) {
+                return;
+            }
             this.emit('state-changed', 'ollama', state);
         });
         
@@ -496,8 +503,10 @@ class LocalAIManager extends EventEmitter {
             const status = await this.getServiceStatus(serviceName);
             this.state[serviceName] = status;
             
-            // 상태 변경 이벤트 발행
-            this.emit('state-changed', serviceName, status);
+            // 상태 변경 이벤트 발행 (only if not paused)
+            if (!this._stateMonitoringPaused) {
+                this.emit('state-changed', serviceName, status);
+            }
         } catch (error) {
             console.error(`[LocalAIManager] Failed to update ${serviceName} state:`, error);
         }
@@ -532,6 +541,10 @@ class LocalAIManager extends EventEmitter {
         }
         
         this.syncInterval = setInterval(async () => {
+            // Skip sync if paused
+            if (this._stateMonitoringPaused) {
+                return;
+            }
             for (const serviceName of Object.keys(this.services)) {
                 await this.updateServiceState(serviceName);
             }
@@ -631,6 +644,32 @@ class LocalAIManager extends EventEmitter {
                     canRetry: false
                 });
         }
+    }
+    
+    /**
+     * Pause state monitoring temporarily (e.g., during embedding operations)
+     * Prevents false "not running" detections when Ollama daemon is busy
+     */
+    pauseStateMonitoring() {
+        this._stateMonitoringPaused = true;
+        // Pause OllamaService's periodic state sync
+        if (this.services.ollama && typeof this.services.ollama.pauseStateSync === 'function') {
+            this.services.ollama.pauseStateSync();
+        }
+        // Also notify ModelStateService to cancel any pending debounced state changes
+        this.emit('pause-state-monitoring');
+    }
+    
+    /**
+     * Resume state monitoring after pausing
+     */
+    resumeStateMonitoring() {
+        this._stateMonitoringPaused = false;
+        // Resume OllamaService's periodic state sync
+        if (this.services.ollama && typeof this.services.ollama.resumeStateSync === 'function') {
+            this.services.ollama.resumeStateSync();
+        }
+        this.emit('resume-state-monitoring');
     }
 }
 

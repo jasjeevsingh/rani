@@ -158,14 +158,14 @@ async function createSTT({ apiKey, language = 'en', callbacks = {}, usePortkey =
  * Creates an OpenAI LLM instance
  * @param {object} opts - Configuration options
  * @param {string} opts.apiKey - OpenAI API key
- * @param {string} [opts.model='gpt-4o'] - Model name
+ * @param {string} [opts.model='gpt-5-mini'] - Model name
  * @param {number} [opts.temperature=0.7] - Temperature
  * @param {number} [opts.maxTokens=2048] - Max tokens
  * @param {boolean} [opts.usePortkey=false] - Whether to use Portkey
  * @param {string} [opts.portkeyVirtualKey] - Portkey virtual key
  * @returns {object} LLM instance
  */
-function createLLM({ apiKey, model = 'gpt-4o', temperature = 0.7, maxTokens = 2048, usePortkey = false, portkeyVirtualKey, ...config }) {
+function createLLM({ apiKey, model = 'gpt-5-mini', temperature = 0.7, maxTokens = 2048, usePortkey = false, portkeyVirtualKey, ...config }) {
   const client = new OpenAI({ apiKey });
   
   const callApi = async (messages) => {
@@ -254,14 +254,14 @@ function createLLM({ apiKey, model = 'gpt-4o', temperature = 0.7, maxTokens = 20
  * Creates an OpenAI streaming LLM instance
  * @param {object} opts - Configuration options
  * @param {string} opts.apiKey - OpenAI API key
- * @param {string} [opts.model='gpt-4o'] - Model name
+ * @param {string} [opts.model='gpt-5-mini'] - Model name
  * @param {number} [opts.temperature=0.7] - Temperature
  * @param {number} [opts.maxTokens=2048] - Max tokens
  * @param {boolean} [opts.usePortkey=false] - Whether to use Portkey
  * @param {string} [opts.portkeyVirtualKey] - Portkey virtual key
  * @returns {object} Streaming LLM instance
  */
-function createStreamingLLM({ apiKey, model = 'gpt-4o', temperature = 0.7, maxTokens = 2048, usePortkey = false, portkeyVirtualKey, ...config }) {
+function createStreamingLLM({ apiKey, model = 'gpt-5-mini', temperature = 0.7, maxTokens = 2048, usePortkey = false, portkeyVirtualKey, ...config }) {
   return {
     streamChat: async (messages) => {
       const fetchUrl = usePortkey 
@@ -313,12 +313,24 @@ function createEmbeddingClient({ apiKey, model = 'text-embedding-3-small' }) {
               return [];
           }
 
-          const response = await client.embeddings.create({
-              model,
-              input: texts
-          });
+          const startTime = Date.now();
+          console.log(`[OpenAI] Creating embeddings for ${texts.length} texts using ${model}`);
 
-          return response.data.map(item => item.embedding);
+          try {
+              const response = await client.embeddings.create({
+                  model,
+                  input: texts
+              });
+
+              const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+              console.log(`[OpenAI] ✅ Generated ${response.data.length} embeddings in ${duration}s`);
+
+              return response.data.map(item => item.embedding);
+          } catch (error) {
+              const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+              console.error(`[OpenAI] ❌ Embedding generation failed after ${duration}s:`, error.message);
+              throw error;
+          }
       }
   };
 }
