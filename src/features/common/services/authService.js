@@ -51,6 +51,29 @@ class AuthService {
     initialize() {
         if (this.isInitialized) return this.initializationPromise;
 
+        this.initializationPromise = new Promise(async (resolve) => {
+            // CLOSED BETA: Firebase disabled, running in local-only mode
+            console.log('[AuthService] Running in local-only mode (Firebase disabled for closed beta)');
+            
+            this.currentUser = null;
+            this.currentUserId = 'default_user';
+            this.currentUserMode = 'local';
+
+            // End active sessions for the local/default user
+            await sessionRepository.endAllActiveSessions();
+
+            // Initialize encryption key for local user
+            await encryptionService.initializeKey(this.currentUserId);
+
+            this.broadcastUserState();
+            this.isInitialized = true;
+            console.log('[AuthService] Initialized in local-only mode.');
+            resolve();
+        });
+
+        return this.initializationPromise;
+        
+        /* FIREBASE VERSION - Re-enable when ready for public release
         this.initializationPromise = new Promise((resolve) => {
             const auth = getFirebaseAuth();
             onAuthStateChanged(auth, async (user) => {
@@ -121,10 +144,29 @@ class AuthService {
                 }
             });
         });
+        */
 
         return this.initializationPromise;
     }
 
+    // CLOSED BETA: Firebase auth methods disabled
+    async startFirebaseAuthFlow() {
+        console.log('[AuthService] Firebase auth disabled for closed beta');
+        return { success: false, error: 'Firebase authentication disabled for closed beta' };
+    }
+
+    async signInWithCustomToken(token) {
+        console.log('[AuthService] Firebase auth disabled for closed beta');
+        throw new Error('Firebase authentication disabled for closed beta');
+    }
+
+    async signOut() {
+        console.log('[AuthService] Firebase auth disabled for closed beta');
+        // Still end sessions
+        await sessionRepository.endAllActiveSessions();
+    }
+    
+    /* FIREBASE AUTH METHODS - Re-enable when ready for public release
     async startFirebaseAuthFlow() {
         try {
             const webUrl = process.env.pickleglass_WEB_URL || 'http://localhost:3000';
@@ -164,6 +206,7 @@ class AuthService {
             console.error('[AuthService] Error signing out:', error);
         }
     }
+    */
     
     broadcastUserState() {
         const userState = this.getCurrentUser();

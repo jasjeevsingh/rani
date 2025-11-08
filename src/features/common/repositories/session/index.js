@@ -8,6 +8,10 @@ function setAuthService(service) {
 }
 
 function getBaseRepository() {
+    // CLOSED BETA: Always use SQLite (Firebase disabled)
+    return sqliteRepository;
+    
+    /* FIREBASE VERSION - Re-enable when ready for public release
     if (!authService) {
         // Fallback or error if authService is not set, to prevent crashes.
         // During initial load, it might not be set, so we default to sqlite.
@@ -18,6 +22,7 @@ function getBaseRepository() {
         return firebaseRepository;
     }
     return sqliteRepository;
+    */
 }
 
 // The adapter layer that injects the UID

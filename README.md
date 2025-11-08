@@ -10,7 +10,10 @@
   <a href="https://github.com/jasjeevsingh/rani/issues"><img src="https://img.shields.io/github/issues/jasjeevsingh/rani" alt="Issues"></a>
   <a href="https://github.com/jasjeevsingh/rani/stargazers"><img src="https://img.shields.io/github/stars/jasjeevsingh/rani" alt="Stars"></a>
   <a href="https://github.com/jasjeevsingh/rani/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jasjeevsingh/rani" alt="License"></a>
+  <img src="https://img.shields.io/badge/status-beta-yellow" alt="Beta Status">
 </p>
+
+> **🧪 BETA STATUS**: RANI is currently in private beta testing. We're working toward a public release with code-signed builds and automatic updates. Want to help test? [Open an issue](https://github.com/jasjeevsingh/rani/issues) to request beta access!
 
 > **Note**: This project is a research-focused fork of [Glass by Pickle](https://github.com/pickle-com/glass), extensively modified and enhanced for academic research workflows. Thanks to the original open-source contributors who made this foundation possible!
 
@@ -69,37 +72,56 @@ graph TD
     end
 ```
 
-## 🚀 Quick Start
+## � Download & Installation
 
-### Prerequisites
+### For Beta Testers
 
-- **Python** 3.8+ ([Download](https://www.python.org/downloads/))
-- **Node.js** 20.x.x ([Download](https://nodejs.org/))
-- **macOS/Windows/Linux** (macOS recommended for full features)
+**Current Version**: `1.0.0-beta.1`
+
+Beta builds are distributed manually via email or Google Drive. If you're a beta tester:
+
+1. **Download** the build for your platform from the shared link
+2. **Follow installation instructions** in the included `README.txt`
+3. **Report issues** via email, text, or [GitHub Issues](https://github.com/jasjeevsingh/rani/issues)
+
+📖 **[Beta Tester Guide](docs/BETA_GUIDE.md)** — Complete installation and testing instructions
+
+⚠️ **Note**: Beta builds are unsigned. You'll see security warnings on first launch:
+- **macOS**: Right-click → Open (don't double-click)
+- **Windows**: Click "More info" → "Run anyway"
+
+### For Developers
+
+Clone and build from source:
 
 ```bash
-# Verify Node.js version
-node --version  # Should be 20.x.x
-
-# If needed, install Node 20 with nvm:
-# curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-# nvm install 20 && nvm use 20
-```
-
-### Installation
-
-```bash
-# Clone and setup
+# Clone repository
 git clone https://github.com/jasjeevsingh/rani.git
 cd rani
+
+# Install dependencies and build
 npm run setup
-```
 
-### First Run
-
-```bash
+# Run in development mode
 npm start
+
+# Build production installers
+./scripts/build-beta.sh
 ```
+
+**Prerequisites**:
+- **Node.js** 20.x.x ([Download](https://nodejs.org/))
+- **Python** 3.8+ ([Download](https://www.python.org/downloads/))
+- **macOS/Windows/Linux** (macOS recommended for full features)
+
+### Public Release (Coming Soon)
+
+The public release will include:
+- ✅ Code-signed builds (no security warnings)
+- ✅ Automatic updates
+- ✅ Direct downloads from GitHub Releases
+- ✅ Homebrew cask (macOS)
+- ✅ Chocolatey package (Windows)
 
 ## 🔬 Research Features
 

@@ -1,7 +1,7 @@
 {
     "name": "rani",
     "productName": "RANI",
-    "version": "0.3.0",
+    "version": "1.0.0-beta.1",
     "description": "Research Assistant for Novel Inquiry - AI-powered research copilot designed to support researchers in learning, annotating, exploring, and experimenting with new ideas.",
     "main": "src/index.js",
     "scripts": {
@@ -10,7 +10,9 @@
         "package": "npm run build:all && electron-builder --dir",
         "make": "npm run build:renderer && electron-forge make",
         "build": "npm run build:all && electron-builder --config electron-builder.yml --publish never",
+        "build:mac": "npm run build:all && electron-builder --mac --universal --publish never",
         "build:win": "npm run build:all && electron-builder --win --x64 --publish never",
+        "build:beta": "npm run build:all && electron-builder --mac --win --publish never",
         "publish": "npm run build:all && electron-builder --config electron-builder.yml --publish always",
         "lint": "eslint --ext .ts,.tsx,.js .",
         "postinstall": "electron-builder install-app-deps",

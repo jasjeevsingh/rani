@@ -23,6 +23,9 @@ const featureBridge = require('./bridge/featureBridge');
 const windowBridge = require('./bridge/windowBridge');
 const ResearchBridge = require('./bridge/researchBridge');
 
+// Error logging for beta testing
+const errorLogger = require('./features/common/services/errorLogger');
+
 // Global variables
 const eventBridge = new EventEmitter();
 let WEB_PORT = 3000;
@@ -165,6 +168,10 @@ setupProtocolHandling();
 
 app.whenReady().then(async () => {
 
+    // Initialize error logger for beta testing
+    await errorLogger.init();
+    console.log('[ErrorLogger] Initialized - logs at:', errorLogger.getLogPath());
+
     // Setup native loopback audio capture for Windows
     session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
         desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
@@ -177,7 +184,8 @@ app.whenReady().then(async () => {
     });
 
     // Initialize core services
-    initializeFirebase();
+    // Firebase disabled for closed beta - using local SQLite only
+    // initializeFirebase();
     
     try {
         await databaseInitializer.initialize();
@@ -242,8 +250,8 @@ app.whenReady().then(async () => {
         );
     }
 
-    // initAutoUpdater should be called after auth is initialized
-    initAutoUpdater();
+    // Auto-updater disabled for manual beta distribution
+    // initAutoUpdater();
 
     // Process any pending deep link after everything is initialized
     if (pendingDeepLinkUrl) {
@@ -705,7 +713,9 @@ async function startWebStack() {
   return frontendPort;
 }
 
-// Auto-update initialization
+// Auto-update initialization - DISABLED FOR MANUAL BETA DISTRIBUTION
+// Uncomment when ready for public release with code signing
+/*
 async function initAutoUpdater() {
     if (process.env.NODE_ENV === 'development') {
         console.log('Development environment, skipping auto-updater.');
@@ -738,3 +748,70 @@ async function initAutoUpdater() {
         console.error('Error initializing auto-updater:', err);
     }
 }
+*/
+
+// ============================================
+// Global Error Handlers for Beta Testing
+// ============================================
+
+// Handle uncaught exceptions
+process.on('uncaughtException', async (error) => {
+    console.error('[UNCAUGHT EXCEPTION]', error);
+    await errorLogger.log(error, { 
+        type: 'uncaughtException',
+        fatal: true 
+    });
+    
+    // In production, show error dialog
+    if (app.isReady()) {
+        dialog.showErrorBox(
+            'Application Error',
+            `An unexpected error occurred: ${error.message}\n\nThe application may need to restart. Error has been logged.`
+        );
+    }
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', async (reason, promise) => {
+    console.error('[UNHANDLED REJECTION]', reason);
+    await errorLogger.log(reason, { 
+        type: 'unhandledRejection',
+        promise: String(promise)
+    });
+});
+
+// Handle warnings
+process.on('warning', async (warning) => {
+    console.warn('[PROCESS WARNING]', warning);
+    await errorLogger.log(warning, { 
+        type: 'warning',
+        name: warning.name,
+        message: warning.message,
+        stack: warning.stack
+    });
+});
+
+// Log app crashes
+app.on('render-process-gone', async (event, webContents, details) => {
+    console.error('[RENDER PROCESS GONE]', details);
+    await errorLogger.log({
+        message: 'Renderer process crashed',
+        reason: details.reason,
+        exitCode: details.exitCode
+    }, { 
+        type: 'rendererCrash'
+    });
+});
+
+app.on('child-process-gone', async (event, details) => {
+    console.error('[CHILD PROCESS GONE]', details);
+    await errorLogger.log({
+        message: 'Child process crashed',
+        type: details.type,
+        reason: details.reason,
+        exitCode: details.exitCode,
+        serviceName: details.serviceName
+    }, { 
+        type: 'childProcessCrash'
+    });
+});

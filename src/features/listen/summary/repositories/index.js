@@ -3,11 +3,16 @@ const firebaseRepository = require('./firebase.repository');
 const authService = require('../../../common/services/authService');
 
 function getBaseRepository() {
+    // CLOSED BETA: Always use SQLite (Firebase disabled)
+    return sqliteRepository;
+    
+    /* FIREBASE VERSION - Re-enable when ready for public release
     const user = authService.getCurrentUser();
     if (user && user.isLoggedIn) {
         return firebaseRepository;
     }
     return sqliteRepository;
+    */
 }
 
 const summaryRepositoryAdapter = {

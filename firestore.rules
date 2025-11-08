@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User data - only accessible by the owner
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Documents - only accessible by the owner
+    match /documents/{docId} {
+      allow read, write: if request.auth != null && 
+                            request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.uid;
+    }
+    
+    // Document chunks - only accessible by the document owner
+    match /document_chunks/{chunkId} {
+      allow read, write: if request.auth != null && 
+                            request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.uid;
+    }
+    
+    // Conversations - only accessible by the owner
+    match /conversations/{convId} {
+      allow read, write: if request.auth != null && 
+                            request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.uid;
+    }
+    
+    // Settings - only accessible by the owner (settingId typically matches userId)
+    match /settings/{settingId} {
+      allow read, write: if request.auth != null && 
+                            request.auth.uid == settingId;
+    }
+    
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

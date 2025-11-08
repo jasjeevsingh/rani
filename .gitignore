@@ -61,6 +61,10 @@ typings/
 # dotenv environment variables file
 .env
 .env.test
+.env.local
+.env.production
+.env.development
+*.env
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

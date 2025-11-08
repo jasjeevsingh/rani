@@ -1,23 +1,19 @@
 # electron-builder.yml
 
 # The unique application ID
-appId: com.pickle.glass
+appId: com.rani.research
 
 # The user-facing application name
-productName: Glass
+productName: RANI
 
-# Publish configuration for GitHub releases
-publish:
-    provider: github
-    owner: pickle-com
-    repo: glass
-    releaseType: draft
+# Publish configuration - disabled for manual beta distribution
+publish: null
 
 # Protocols configuration for deep linking
 protocols:
-    name: PickleGlass Protocol
+    name: RANI Protocol
     schemes: 
-        - pickleglass
+        - rani
 
 # List of files to be included in the app package
 files:
@@ -46,11 +42,7 @@ win:
         - target: portable
           arch: x64
     requestedExecutionLevel: asInvoker
-    signAndEditExecutable: true
-    cscLink: build\certs\glass-dev.pfx
-    cscKeyPassword: "${env.CSC_KEY_PASSWORD}"
-    signtoolOptions:
-      certificateSubjectName: "Glass Dev Code Signing"
+    # Signing disabled for beta - manual distribution
 
 # NSIS installer configuration for Windows
 nsis:
@@ -60,7 +52,7 @@ nsis:
     deleteAppDataOnUninstall: true
     createDesktopShortcut: always
     createStartMenuShortcut: true
-    shortcutName: Glass
+    shortcutName: RANI
 
 # macOS specific configuration
 mac:
@@ -70,7 +62,8 @@ mac:
     icon: src/ui/assets/logo.icns
     # Minimum macOS version (supports both Intel and Apple Silicon)
     minimumSystemVersion: '11.0'
-    hardenedRuntime: true
+    # Disabled for unsigned beta builds
+    hardenedRuntime: false
     entitlements: entitlements.plist
     entitlementsInherit: entitlements.plist
     target:

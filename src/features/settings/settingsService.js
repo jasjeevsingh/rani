@@ -2,7 +2,6 @@ const { ipcMain, BrowserWindow } = require('electron');
 const Store = require('electron-store');
 const authService = require('../common/services/authService');
 const settingsRepository = require('./repositories');
-const { getStoredApiKey, getStoredProvider, windowPool } = require('../../window/windowManager');
 
 // New imports for common services
 const modelStateService = require('../common/services/modelStateService');
@@ -123,6 +122,9 @@ class WindowNotificationManager {
     getRelevantWindows(windowTypes) {
         const allWindows = BrowserWindow.getAllWindows();
         const relevantWindows = [];
+
+        // Lazy-load windowPool to avoid circular dependency
+        const { windowPool } = require('../../window/windowManager');
 
         allWindows.forEach(win => {
             if (win.isDestroyed()) return;
@@ -387,6 +389,9 @@ async function updateContentProtection(enabled) {
     try {
         const settings = await getSettings();
         settings.contentProtection = enabled;
+        
+        // Lazy-load windowPool to avoid circular dependency
+        const { windowPool } = require('../../window/windowManager');
         
         // Update content protection in main window
         const { app } = require('electron');
