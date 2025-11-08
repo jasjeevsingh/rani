@@ -85,7 +85,9 @@ class PermissionService {
           console.log('[Permissions] Screen capture request triggered (expected to fail):', captureError.message);
         }
         
-        // await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+        // Open System Preferences to Screen Recording settings
+        console.log('[Permissions] Opening System Preferences for Screen Recording...');
+        await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
       }
       return { success: true };
     } catch (error) {

@@ -396,7 +396,7 @@ export class PermissionHeader extends LitElement {
             
             
             // Check permissions again after a delay
-            // setTimeout(() => this.checkPermissions(), 1000);
+            setTimeout(() => this.checkPermissions(), 1000);
         } catch (error) {
             console.error('[PermissionHeader] Error requesting microphone permission:', error);
         }
@@ -419,14 +419,47 @@ export class PermissionHeader extends LitElement {
             if (permissions.screen === 'not-determined' || permissions.screen === 'denied' || permissions.screen === 'unknown' || permissions.screen === 'restricted') {
             console.log('[PermissionHeader] Opening screen recording preferences...');
             await window.api.permissionHeader.openSystemPreferences('screen-recording');
-            }
             
-            // Check permissions again after a delay
-            // (This may not execute if app restarts after permission grant)
-            // setTimeout(() => this.checkPermissions(), 2000);
+            // Start polling to detect when permission is granted
+            this.startPermissionPolling('screen');
+            }
         } catch (error) {
             console.error('[PermissionHeader] Error opening screen recording preferences:', error);
         }
+    }
+
+    startPermissionPolling(type) {
+        // Poll every 2 seconds for up to 2 minutes
+        let attempts = 0;
+        const maxAttempts = 60;
+        
+        const pollInterval = setInterval(async () => {
+            attempts++;
+            
+            try {
+                const permissions = await window.api.permissionHeader.checkSystemPermissions();
+                
+                if (type === 'screen' && permissions.screen === 'granted') {
+                    this.screenGranted = 'granted';
+                    this.requestUpdate();
+                    clearInterval(pollInterval);
+                    console.log('[PermissionHeader] Screen recording permission granted!');
+                } else if (type === 'microphone' && permissions.microphone === 'granted') {
+                    this.microphoneGranted = 'granted';
+                    this.requestUpdate();
+                    clearInterval(pollInterval);
+                    console.log('[PermissionHeader] Microphone permission granted!');
+                }
+                
+                if (attempts >= maxAttempts) {
+                    clearInterval(pollInterval);
+                    console.log('[PermissionHeader] Permission polling timed out');
+                }
+            } catch (error) {
+                console.error('[PermissionHeader] Error during permission polling:', error);
+                clearInterval(pollInterval);
+            }
+        }, 2000);
     }
 
     async handleKeychainClick() {

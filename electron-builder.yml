@@ -19,6 +19,7 @@ protocols:
 files:
     - src/**/*
     - package.json
+    - .env.beta
     - pickleglass_web/backend_node/**/*
     - '!**/node_modules/electron/**'
     - public/build/**/*

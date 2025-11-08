@@ -157,9 +157,46 @@ class HeaderTransitionManager {
 
     // WelcomeHeader 콜백 메서드들
     async handleLoginOption() {
-        console.log('[HeaderController] Login option selected');
-        if (window.api) {
-            await window.api.common.startFirebaseAuth();
+        console.log('[HeaderController] Quick start option selected - configuring beta API key');
+        
+        if (!window.api) {
+            console.error('[HeaderController] window.api not available');
+            return;
+        }
+
+        try {
+            // Check if beta API key is available
+            const hasBetaKey = await window.api.common.hasBetaApiKey();
+            
+            if (!hasBetaKey) {
+                console.error('[HeaderController] No beta API key available');
+                // Fall back to API key entry
+                this.handleApiKeyOption();
+                return;
+            }
+
+            // Configure the beta API key
+            const result = await window.api.common.configureBetaApiKey();
+            
+            if (result.success) {
+                console.log('[HeaderController] Beta API key configured successfully');
+                
+                // Check permissions and proceed
+                const permissionResult = await this.checkPermissions();
+                if (permissionResult.success) {
+                    this.transitionToMainHeader();
+                } else {
+                    this.transitionToPermissionHeader();
+                }
+            } else {
+                console.error('[HeaderController] Failed to configure beta API key:', result.error);
+                // Fall back to API key entry
+                this.handleApiKeyOption();
+            }
+        } catch (error) {
+            console.error('[HeaderController] Error in handleLoginOption:', error);
+            // Fall back to API key entry
+            this.handleApiKeyOption();
         }
     }
 

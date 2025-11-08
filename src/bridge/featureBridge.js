@@ -5,6 +5,7 @@ const authService = require('../features/common/services/authService');
 const whisperService = require('../features/common/services/whisperService');
 const ollamaService = require('../features/common/services/ollamaService');
 const modelStateService = require('../features/common/services/modelStateService');
+const betaConfigService = require('../features/common/services/betaConfigService');
 const shortcutsService = require('../features/shortcuts/shortcutsService');
 const presetRepository = require('../features/common/repositories/preset');
 const localAIManager = require('../features/common/services/localAIManager');
@@ -53,6 +54,10 @@ module.exports = {
     ipcMain.handle('get-current-user', () => authService.getCurrentUser());
     ipcMain.handle('start-firebase-auth', async () => await authService.startFirebaseAuthFlow());
     ipcMain.handle('firebase-logout', async () => await authService.signOut());
+
+    // Beta Config
+    ipcMain.handle('beta:has-api-key', () => betaConfigService.hasBetaApiKey());
+    ipcMain.handle('beta:configure-api-key', async () => await betaConfigService.configureBetaApiKey());
 
     // App
     ipcMain.handle('quit-application', () => app.quit());
