@@ -1,7 +1,7 @@
 {
     "name": "rani",
     "productName": "RANI",
-    "version": "1.0.0-beta.1",
+    "version": "1.0.0-beta.4",
     "description": "Research Assistant for Novel Inquiry - AI-powered research copilot designed to support researchers in learning, annotating, exploring, and experimenting with new ideas.",
     "main": "src/index.js",
     "scripts": {
