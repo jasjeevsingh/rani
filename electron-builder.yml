@@ -15,6 +15,9 @@ protocols:
     schemes: 
         - rani
 
+# Hook scripts
+afterPack: adhoc-sign.js
+
 # List of files to be included in the app package
 files:
     - src/**/*
@@ -61,6 +64,8 @@ mac:
     category: public.app-category.utilities
     # Path to the .icns icon file
     icon: src/ui/assets/logo.icns
+    # Force ad-hoc signing via custom hook
+    identity: null
     # Minimum macOS version (supports both Intel and Apple Silicon)
     minimumSystemVersion: '11.0'
     # Disabled for unsigned beta builds
