@@ -157,9 +157,47 @@ class HeaderTransitionManager {
 
     // WelcomeHeader 콜백 메서드들
     async handleLoginOption() {
-        console.log('[HeaderController] Login option selected');
+        console.log('[HeaderController] Quick start option selected - configuring beta API key');
+        
         if (window.api) {
-            await window.api.common.startFirebaseAuth();
+            try {
+                // Check if beta API key exists
+                console.log('[HeaderController] Checking for beta API key...');
+                const hasBetaKey = await window.api.common.hasBetaApiKey();
+                console.log('[HeaderController] Has beta key:', hasBetaKey);
+                
+                if (hasBetaKey) {
+                    console.log('[HeaderController] Beta API key found, configuring...');
+                    const success = await window.api.common.configureBetaApiKey();
+                    console.log('[HeaderController] Configuration success:', success);
+                    
+                    if (success) {
+                        console.log('[HeaderController] Beta API key configured successfully');
+                        // Proceed to permission setup
+                        const permissionResult = await this.checkPermissions();
+                        console.log('[HeaderController] Permission result:', permissionResult);
+                        if (permissionResult.success) {
+                            // Permissions already granted, go straight to main
+                            this.transitionToMainHeader();
+                        } else {
+                            // Need to set up permissions
+                            this.transitionToPermissionHeader();
+                        }
+                    } else {
+                        console.error('[HeaderController] Failed to configure beta API key');
+                        // Fall back to API key entry
+                        this.handleApiKeyOption();
+                    }
+                } else {
+                    console.log('[HeaderController] No beta API key found, showing API key entry');
+                    // No beta key available, show API key entry
+                    this.handleApiKeyOption();
+                }
+            } catch (error) {
+                console.error('[HeaderController] Error configuring beta API key:', error);
+                // Fall back to API key entry
+                this.handleApiKeyOption();
+            }
         }
     }
 

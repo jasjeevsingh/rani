@@ -19,6 +19,7 @@ const askService = require('./features/ask/askService');
 const settingsService = require('./features/settings/settingsService');
 const sessionRepository = require('./features/common/repositories/session');
 const modelStateService = require('./features/common/services/modelStateService');
+const betaConfigService = require('./features/common/services/betaConfigService');
 const featureBridge = require('./bridge/featureBridge');
 const windowBridge = require('./bridge/windowBridge');
 const ResearchBridge = require('./bridge/researchBridge');
@@ -202,6 +203,10 @@ app.whenReady().then(async () => {
         //////// after_modelStateService ////////
         await modelStateService.initialize();
         //////// after_modelStateService ////////
+
+        // Initialize beta configuration service
+        betaConfigService.initialize();
+        console.log('[index.js] Beta configuration service initialized');
 
         featureBridge.initialize();  // 추가: featureBridge 초기화
         windowBridge.initialize();
