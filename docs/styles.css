@@ -236,7 +236,7 @@ body.dark .institutional-logo {
 
 body.dark .institutional-logo:hover {
     opacity: 1;
-    transform: translateY(-5px);
+    transform: scale(1.1);
     filter: drop-shadow(0 10px 20px rgba(99, 102, 241, 0.3));
 }
 
@@ -1554,26 +1554,53 @@ body.dark .mobile-menu-btn span {
     color: var(--text-primary);
 }
 
+.institutional-badges-wrapper {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    padding: var(--spacing-xl) 0;
+    -webkit-overflow-scrolling: touch;
+}
+
 .institutional-badges {
     display: flex;
-    justify-content: center;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
-    flex-wrap: wrap;
-    gap: var(--spacing-2xl);
-    padding: 0 var(--spacing-xl);
+    gap: var(--spacing-3xl);
+    animation: scroll-logos 80s linear infinite;
+    width: max-content;
+    will-change: transform;
+}
+
+.institutional-badges:hover {
+    animation-play-state: paused;
+}
+
+@keyframes scroll-logos {
+    0% {
+        transform: translateX(0%);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
 }
 
 .institutional-logo {
-    height: 120px;
+    height: 80px;
+    min-width: 80px;
     width: auto;
     object-fit: contain;
-    opacity: 1;
+    opacity: 0.8;
     transition: all var(--transition-base);
+    flex-shrink: 0;
+    display: block;
 }
 
 .institutional-logo:hover {
-    transform: translateY(-5px);
-    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
+    opacity: 1;
+    transform: scale(1.1);
+    filter: drop-shadow(0 10px 20px rgba(99, 102, 241, 0.3));
 }
 
 /* Legacy styles for backward compatibility */
@@ -2053,11 +2080,13 @@ body.dark .mobile-menu-btn span {
         margin-top: var(--spacing-xl);
     }
     
-    .institutional-badges {
-        flex-direction: column;
+    .institutional-logo {
+        height: 60px;
+        min-width: 60px;
     }
     
-    .institutional-logo {
-        height: 64px;
+    .institutional-badges {
+        gap: var(--spacing-2xl);
+        animation: scroll-logos 20s linear infinite;
     }
 }
