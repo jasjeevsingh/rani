@@ -49,28 +49,32 @@ All references to the old project naming have been updated:
 5. Click **"Register app"**
 6. Copy the `firebaseConfig` object
 
-### 3. Update Firebase Client Configuration
+### 3. Configure Environment Variables
 
-Open `src/features/common/services/firebaseClient.js` and replace the config with your values:
+**IMPORTANT: Never commit API keys to git!**
 
-```javascript
-const firebaseConfig = {
-    apiKey: 'YOUR_API_KEY',
-    authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.firebasestorage.app',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    appId: 'YOUR_APP_ID',
-    measurementId: 'YOUR_MEASUREMENT_ID' // Optional
-};
-```
+RANI uses environment variables to keep your Firebase credentials secure.
 
-**Current placeholder values** (update these):
-```javascript
-authDomain: 'rani-app.firebaseapp.com',
-projectId: 'rani-app',
-storageBucket: 'rani-app.firebasestorage.app',
-```
+1. **Copy the template file:**
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. **Edit `.env.local`** and add your Firebase credentials from step 2:
+   ```bash
+   # Firebase Configuration
+   FIREBASE_API_KEY=AIzaSy...  # Your actual API key
+   FIREBASE_AUTH_DOMAIN=rani-ai.firebaseapp.com
+   FIREBASE_PROJECT_ID=rani-ai
+   FIREBASE_STORAGE_BUCKET=rani-ai.firebasestorage.app
+   FIREBASE_MESSAGING_SENDER_ID=251595283316
+   FIREBASE_APP_ID=1:251595283316:web:...
+   FIREBASE_MEASUREMENT_ID=G-QDS9XGNMTV
+   ```
+
+3. **Verify `.env.local` is in `.gitignore`** (it already is, but double-check)
+
+**Note:** The file `src/features/common/services/firebaseClient.js` now reads from environment variables. You don't need to edit it directly.
 
 ### 4. Enable Firebase Services
 
@@ -99,7 +103,7 @@ storageBucket: 'rani-app.firebasestorage.app',
 
 ### 5. Update Firebase Project ID
 
-If you used a different project ID than `rani-app`, update `.firebaserc`:
+If you used a different project ID than `rani-ai`, update `.firebaserc`:
 
 ```json
 {

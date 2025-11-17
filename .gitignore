@@ -59,6 +59,7 @@ typings/
 .yarn-integrity
 
 # dotenv environment variables file
+# IMPORTANT: Never commit these files - they contain sensitive API keys
 .env
 .env.test
 .env.local

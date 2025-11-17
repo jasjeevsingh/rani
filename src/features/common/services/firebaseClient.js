@@ -57,14 +57,17 @@ function createElectronStorePersistence(storeName = 'firebase-auth-session') {
     };
 }
 
+// Firebase configuration loaded from environment variables
+// IMPORTANT: Never commit your actual API keys to version control
+// Use .env files (which should be in .gitignore) to store these values
 const firebaseConfig = {
-    apiKey: "AIzaSyA4AkEIFwuVR6J_DbUCUsNwrIZ3wwl8zTU",
-    authDomain: "rani-ai.firebaseapp.com",
-    projectId: "rani-ai",
-    storageBucket: "rani-ai.firebasestorage.app",
-    messagingSenderId: "251595283316",
-    appId: "1:251595283316:web:5a0df10f89a91ec4aaaa21",
-    measurementId: "G-QDS9XGNMTV"
+    apiKey: process.env.FIREBASE_API_KEY || "",
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || "rani-ai.firebaseapp.com",
+    projectId: process.env.FIREBASE_PROJECT_ID || "rani-ai",
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "rani-ai.firebasestorage.app",
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "",
+    appId: process.env.FIREBASE_APP_ID || "",
+    measurementId: process.env.FIREBASE_MEASUREMENT_ID || ""
 };
 
 let firebaseApp = null;
