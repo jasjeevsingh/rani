@@ -29,7 +29,9 @@ admin.initializeApp();
  * On success, return success response with user information.
  * On failure, return error message.
  *
- * @param {object} request - HTTPS request object. Contains { token: "..." } in body.
+ * Note: The ID token should be provided in `request.body.token`.
+ *
+ * @param {object} request - HTTPS request object.
  * @param {object} response - HTTPS response object.
  */
 const authCallbackHandler = (request, response) => {
@@ -60,7 +62,7 @@ const authCallbackHandler = (request, response) => {
       logger.info("Successfully verified token for UID:", uid);
 
       const customToken = await admin.auth().createCustomToken(uid);
-      
+
       response.status(200).send({
         success: true,
         message: "Authentication successful.",

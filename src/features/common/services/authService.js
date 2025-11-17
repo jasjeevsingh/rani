@@ -169,7 +169,7 @@ class AuthService {
     /* FIREBASE AUTH METHODS - Re-enable when ready for public release
     async startFirebaseAuthFlow() {
         try {
-            const webUrl = process.env.pickleglass_WEB_URL || 'http://localhost:3000';
+            const webUrl = process.env.RANI_WEB_URL || 'http://localhost:3000';
             const authUrl = `${webUrl}/login?mode=electron`;
             console.log(`[AuthService] Opening Firebase auth URL in browser: ${authUrl}`);
             await shell.openExternal(authUrl);

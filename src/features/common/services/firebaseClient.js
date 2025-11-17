@@ -58,13 +58,13 @@ function createElectronStorePersistence(storeName = 'firebase-auth-session') {
 }
 
 const firebaseConfig = {
-    apiKey: 'AIzaSyAgtJrmsFWG1C7m9S55HyT1laICEzuUS2g',
-    authDomain: 'pickle-3651a.firebaseapp.com',
-    projectId: 'pickle-3651a',
-    storageBucket: 'pickle-3651a.firebasestorage.app',
-    messagingSenderId: '904706892885',
-    appId: '1:904706892885:web:0e42b3dda796674ead20dc',
-    measurementId: 'G-SQ0WM6S28T',
+    apiKey: "AIzaSyA4AkEIFwuVR6J_DbUCUsNwrIZ3wwl8zTU",
+    authDomain: "rani-ai.firebaseapp.com",
+    projectId: "rani-ai",
+    storageBucket: "rani-ai.firebasestorage.app",
+    messagingSenderId: "251595283316",
+    appId: "1:251595283316:web:5a0df10f89a91ec4aaaa21",
+    measurementId: "G-QDS9XGNMTV"
 };
 
 let firebaseApp = null;

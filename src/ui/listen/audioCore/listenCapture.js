@@ -566,8 +566,8 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         }
     } catch (err) {
         console.error('Error starting capture:', err);
-        // Note: pickleGlass.e() is not available in this context, commenting out
-        // pickleGlass.e().setStatus('error');
+        // Note: rani.e() is not available in this context, commenting out
+        // rani.e().setStatus('error');
     }
 }
 
@@ -626,7 +626,7 @@ module.exports = {
 // Expose functions to global scope for external access (exact from renderer.js)
 if (typeof window !== 'undefined') {
     window.listenCapture = module.exports;
-    window.pickleGlass = window.pickleGlass || {};
-    window.pickleGlass.startCapture = startCapture;
-    window.pickleGlass.stopCapture = stopCapture;
+    window.rani = window.rani || {};
+    window.rani.startCapture = startCapture;
+    window.rani.stopCapture = stopCapture;
 } 

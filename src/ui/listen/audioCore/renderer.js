@@ -4,7 +4,7 @@ const params        = new URLSearchParams(window.location.search);
 const isListenView  = params.get('view') === 'listen';
 
 
-window.pickleGlass = {
+window.rani = {
     startCapture: listenCapture.startCapture,
     stopCapture: listenCapture.stopCapture,
     isLinux: listenCapture.isLinux,

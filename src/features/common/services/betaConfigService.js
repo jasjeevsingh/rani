@@ -130,6 +130,8 @@ class BetaConfigService {
 
         try {
             const modelStateService = require('./modelStateService');
+            const authService = require('./authService');
+            const userRepository = require('../repositories/user');
             
             // Set the OpenAI API key
             await modelStateService.setApiKey('openai', apiKey);
@@ -137,7 +139,14 @@ class BetaConfigService {
             // Set o4-mini as the default model
             await modelStateService.setSelectedModel('llm', 'o4-mini');
             
-            console.log('[BetaConfig] Successfully configured OpenAI with beta key');
+            // Mark user as using shared API key (will require subscription)
+            const uid = authService.getCurrentUserId();
+            await userRepository.update({ 
+                uid, 
+                subscriptionData: { api_key_mode: 'shared' } 
+            });
+            
+            console.log('[BetaConfig] Successfully configured OpenAI with beta key and set api_key_mode to shared');
             return true;
         } catch (error) {
             console.error('[BetaConfig] Error configuring beta API key:', error);

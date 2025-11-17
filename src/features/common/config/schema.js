@@ -6,7 +6,14 @@ const LATEST_SCHEMA = {
             { name: 'email', type: 'TEXT NOT NULL' },
             { name: 'created_at', type: 'INTEGER' },
             { name: 'auto_update_enabled', type: 'INTEGER DEFAULT 1' },
-            { name: 'has_migrated_to_firebase', type: 'INTEGER DEFAULT 0' }
+            { name: 'has_migrated_to_firebase', type: 'INTEGER DEFAULT 0' },
+            { name: 'api_key_mode', type: 'TEXT DEFAULT \'shared\'' },
+            { name: 'stripe_customer_id', type: 'TEXT' },
+            { name: 'subscription_id', type: 'TEXT' },
+            { name: 'subscription_status', type: 'TEXT DEFAULT \'inactive\'' },
+            { name: 'subscription_start_date', type: 'INTEGER' },
+            { name: 'subscription_end_date', type: 'INTEGER' },
+            { name: 'subscription_cancel_at', type: 'INTEGER' }
         ]
     },
     sessions: {

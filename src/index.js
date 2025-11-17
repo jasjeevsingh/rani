@@ -204,6 +204,11 @@ app.whenReady().then(async () => {
         await modelStateService.initialize();
         //////// after_modelStateService ////////
 
+        // Initialize Stripe service for subscription validation
+        const stripeService = require('./features/settings/stripeService');
+        stripeService.initialize();
+        console.log('[index.js] Stripe service initialized');
+
         // Initialize beta configuration service
         betaConfigService.initialize();
         console.log('[index.js] Beta configuration service initialized');
@@ -248,6 +253,21 @@ app.whenReady().then(async () => {
         console.log('Web front-end listening on', WEB_PORT);
         
         createWindows();
+
+        // Check subscription status after windows are created
+        setTimeout(async () => {
+            try {
+                const subscriptionGuard = require('./features/settings/subscriptionGuard');
+                const uid = authService.getCurrentUserId();
+                const hasAccess = await subscriptionGuard.requireSubscription(uid, 'RANI');
+                
+                if (!hasAccess) {
+                    console.log('[Subscription] Access denied - subscription required');
+                }
+            } catch (error) {
+                console.error('[Subscription] Error checking subscription:', error);
+            }
+        }, 3000); // Wait 3 seconds for windows to fully load
 
     } catch (err) {
         console.error('>>> [index.js] Database initialization failed - some features may not work', err);
@@ -536,7 +556,7 @@ async function handleFirebaseAuthCallback(params) {
     console.log('[Auth] Received ID token from deep link, exchanging for custom token...');
 
     try {
-        const functionUrl = 'https://us-west1-pickle-3651a.cloudfunctions.net/pickleGlassAuthCallback';
+        const functionUrl = 'https://us-west1-rani-ai.cloudfunctions.net/raniAuthCallback';
         const response = await fetch(functionUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

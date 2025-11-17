@@ -6,6 +6,7 @@ const providerSettingsRepository = require('../repositories/providerSettings');
 const authService = require('./authService');
 const ollamaModelRepository = require('../repositories/ollamaModel');
 const ollamaService = require('./ollamaService');
+const userRepository = require('../repositories/user');
 
 class ModelStateService extends EventEmitter {
     constructor() {
@@ -245,6 +246,21 @@ class ModelStateService extends EventEmitter {
         const finalKey = (provider === 'ollama' || provider === 'whisper') ? 'local' : key;
         const existingSettings = await providerSettingsRepository.getByProvider(provider) || {};
         await providerSettingsRepository.upsert(provider, { ...existingSettings, api_key: finalKey });
+        
+        // Mark user as using personal API keys (not the shared beta key)
+        // This ensures they won't be charged subscription fees
+        if (provider !== 'openai-glass') {
+            try {
+                const userId = this.authService.getCurrentUserId();
+                if (userId) {
+                    await userRepository.update(userId, { api_key_mode: 'personal' });
+                    console.log(`[ModelStateService] Set api_key_mode='personal' for user ${userId}`);
+                }
+            } catch (error) {
+                console.error('[ModelStateService] Failed to set api_key_mode:', error);
+                // Don't fail the entire operation if this fails
+            }
+        }
         
         // 키가 추가/변경되었으므로, 해당 provider의 모델을 자동 선택할 수 있는지 확인
         await this._autoSelectAvailableModels([]);

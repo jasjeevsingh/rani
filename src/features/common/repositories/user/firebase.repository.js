@@ -26,7 +26,15 @@ async function findOrCreate(user) {
             email: email || docSnap.data().email || 'no-email@example.com'
         }, { merge: true });
     } else {
-        await setDoc(docRef, { uid, display_name: displayName || 'User', email: email || 'no-email@example.com', created_at: now });
+        // New user - default to shared API key mode with inactive subscription
+        await setDoc(docRef, { 
+            uid, 
+            display_name: displayName || 'User', 
+            email: email || 'no-email@example.com', 
+            created_at: now,
+            api_key_mode: 'shared',
+            subscription_status: 'inactive'
+        });
     }
     const finalDoc = await getDoc(docRef);
     return finalDoc.data();
@@ -40,9 +48,19 @@ async function getById(uid) {
 
 
 
-async function update({ uid, displayName }) {
+async function update({ uid, displayName, subscriptionData }) {
     const docRef = doc(usersCol(), uid);
-    await setDoc(docRef, { display_name: displayName }, { merge: true });
+    const updateData = {};
+    
+    if (displayName !== undefined) {
+        updateData.display_name = displayName;
+    }
+    
+    if (subscriptionData) {
+        Object.assign(updateData, subscriptionData);
+    }
+    
+    await setDoc(docRef, updateData, { merge: true });
     return { changes: 1 };
 }
 

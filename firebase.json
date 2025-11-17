@@ -1,8 +1,7 @@
 {
   "functions": [
     {
-      "source": "functions",
-      "codebase": "pickle-glass",
+      "codebase": "rani",
       "ignore": [
         "node_modules",
         ".git",
@@ -12,7 +11,8 @@
       ],
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run lint"
-      ]
+      ],
+      "source": "functions"
     }
   ],
   "firestore": {

@@ -55,6 +55,65 @@ module.exports = {
     ipcMain.handle('start-firebase-auth', async () => await authService.startFirebaseAuthFlow());
     ipcMain.handle('firebase-logout', async () => await authService.signOut());
 
+    // Subscription
+    const stripeService = require('../features/settings/stripeService');
+    const subscriptionGuard = require('../features/settings/subscriptionGuard');
+    
+    ipcMain.handle('subscription:get-status', async () => {
+        try {
+            const uid = authService.getCurrentUserId();
+            const validation = await subscriptionGuard.checkSubscription(uid);
+            return { success: true, ...validation };
+        } catch (error) {
+            console.error('[FeatureBridge] Error getting subscription status:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('subscription:create-checkout', async () => {
+        try {
+            const uid = authService.getCurrentUserId();
+            const url = await stripeService.createCheckoutSession(uid);
+            return { success: true, url };
+        } catch (error) {
+            console.error('[FeatureBridge] Error creating checkout:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('subscription:open-portal', async () => {
+        try {
+            const uid = authService.getCurrentUserId();
+            const user = await require('../common/repositories/user').getById(uid);
+            
+            if (!user || !user.stripe_customer_id) {
+                return { success: false, error: 'No Stripe customer found' };
+            }
+
+            const session = await stripeService.stripe.billingPortal.sessions.create({
+                customer: user.stripe_customer_id,
+                return_url: 'rani://subscription/portal-return',
+            });
+
+            return { success: true, url: session.url };
+        } catch (error) {
+            console.error('[FeatureBridge] Error opening portal:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('subscription:refresh-status', async () => {
+        try {
+            const uid = authService.getCurrentUserId();
+            subscriptionGuard.clearCache(uid);
+            const validation = await subscriptionGuard.checkSubscription(uid, true);
+            return { success: true, ...validation };
+        } catch (error) {
+            console.error('[FeatureBridge] Error refreshing status:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     // App
     ipcMain.handle('quit-application', () => app.quit());
 
